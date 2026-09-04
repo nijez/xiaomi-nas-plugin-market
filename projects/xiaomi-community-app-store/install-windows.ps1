@@ -141,7 +141,7 @@ foreach ($relative in $required) {
     }
 }
 
-$releaseId = "0.1.1-$(Get-Date -Format yyyyMMddHHmmss)"
+$releaseId = "0.1.2-$(Get-Date -Format yyyyMMddHHmmss)"
 $ScpOptions = @($SshOptions)
 $sshVersion = (& cmd.exe /c "ssh.exe -V 2>&1" | Out-String)
 if ($sshVersion -match 'OpenSSH(?:_for_Windows)?_(\d+)' -and [int]$Matches[1] -ge 9) {

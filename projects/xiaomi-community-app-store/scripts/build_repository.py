@@ -23,6 +23,26 @@ CATALOG = PROJECT / "catalog"
 
 PACKAGE_SPECS: list[dict[str, Any]] = [
     {
+        "id": "qbittorrent", "name": "qB 下载", "version": "0.1.0-rc1",
+        "summary": "磁力与种子下载、暂停继续和限速；首次启动需拉取独立 Docker 镜像",
+        "project": WORK / "xiaomi-qbittorrent-plugin", "pluginId": 11004, "port": 18122,
+        "releaseRoot": "/data/plugin/qbittorrent", "uiKey": "qbittorrent",
+        "iconSource": "web/assets/qb.png", "iconName": "qbittorrent.icon",
+        "runtime": {"server.py": "server.py", "engine.py": "engine.py", "web": "web", "licenses": "licenses", "README.md": "README.md"},
+        "ui": "web", "serviceSource": "deploy/xiaomi-qbittorrent.service",
+        "service": "xiaomi-qbittorrent.service", "nginxSource": "deploy/xiaomi-qbittorrent.nginx.conf",
+        "nginx": "xiaomi-qbittorrent.conf", "healthPath": "/healthz",
+        "registry": {
+            "icon": "/icon/qbittorrent.icon?v=0.1.0-rc1",
+            "frontend": {"title": "qB 下载", "desc": "下载任务管理", "type": "url",
+                "permission": ["admin"], "dev_type": [1, 2, 3, 4],
+                "url": [{"dev_type": [1], "url": "/index.html#/qbDownloads_app"},
+                        {"dev_type": [2, 3, 4], "url": "/index.html#/qbDownloads_pc"}],
+                "sortid": 11004, "widget": []},
+            "info": {"tags": ["download"], "publisher": "community", "ext": {"admin": True}}
+        }
+    },
+    {
         "id": "webdav",
         "name": "WebDAV 文件桥",
         "version": "0.2.0-rc5",

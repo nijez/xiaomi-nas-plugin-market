@@ -1,8 +1,19 @@
 {
   "schemaVersion": 1,
   "name": "小米智能存储插件市场",
-  "generatedAt": 1788526659,
+  "generatedAt": 1788528323,
   "packages": [
+    {
+      "id": "qbittorrent",
+      "name": "qB 下载",
+      "version": "0.1.0-rc1",
+      "summary": "磁力与种子下载、暂停继续和限速；首次启动需拉取独立 Docker 镜像",
+      "bundle": "bundles/qbittorrent-0.1.0-rc1.bundle.zip",
+      "signature": "bundles/qbittorrent-0.1.0-rc1.bundle.zip.sig",
+      "sha256": "884b103d4430de3e0ffea8d8aef1c2e781affbd9c440d5dd33b97cc586d0ca07",
+      "icon": "icons/qbittorrent.png",
+      "channel": "candidate"
+    },
     {
       "id": "webdav",
       "name": "WebDAV 文件桥",

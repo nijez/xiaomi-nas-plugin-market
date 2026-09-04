@@ -46,7 +46,7 @@ Windows 没有 OpenSSH 客户端
 ----------
 在 ZIP 所在目录打开 PowerShell，运行：
 
-Get-FileHash .\xiaomi-plugin-market-0.1.1.zip -Algorithm SHA256
+Get-FileHash .\xiaomi-plugin-market-0.1.2.zip -Algorithm SHA256
 
 将输出与一同发布的 SHA256SUMS.txt 比对，一致后再解压安装。
 

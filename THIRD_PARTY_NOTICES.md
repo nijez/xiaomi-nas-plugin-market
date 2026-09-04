@@ -7,3 +7,6 @@
 - 图标和界面中使用的 Radix Icons 按其 MIT 许可证分发。
 
 本项目自编代码的统一开源许可证尚待作者确定；公开提供源码不表示第三方商标、素材或依赖被重新授权。第三方组件始终遵循其原有许可。
+# qBittorrent 资产与容器
+
+`projects/xiaomi-qbittorrent-plugin/licenses` 保留 qBittorrent COPYING、GPLv3、AUTHORS 和原始 ICO 图标；PNG 仅为格式转换，上游资产继续适用其 GPL 许可，不代表品牌背书。qB 应用本体未嵌入 ZIP，使用者明确启动时从 LinuxServer 的 GHCR 仓库拉取锁定 digest 的镜像。Radix 按钮图标保留原许可证。

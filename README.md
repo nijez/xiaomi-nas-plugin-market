@@ -6,7 +6,7 @@
 
 ## 下载与安装
 
-在本仓库 **Releases** 下载 `xiaomi-plugin-market-0.1.1.zip` 和 `SHA256SUMS.txt`。不要用 GitHub 的 `Source code.zip` 代替安装包。
+在本仓库 **Releases** 下载 `xiaomi-plugin-market-0.1.2.zip` 和 `SHA256SUMS.txt`。不要用 GitHub 的 `Source code.zip` 代替安装包。
 
 1. 确认 NAS 已 root，电脑与 NAS 在同一局域网，并且你持有这台 NAS 自己的 root SSH 私钥。
 2. 核对 SHA-256 后完整解压，不要在压缩包内直接运行。
@@ -26,6 +26,7 @@ Mac 如果拦截未签名的 `.command`，在终端运行 `bash install.sh`；�
 | [115 云备份](projects/xiaomi-115-sync-plugin) | 0.1.0 | 需要自己获批的 115 App ID，再扫码授权；不是免开发者认证登录 |
 | [阿里云盘备份](projects/xiaomi-aliyundrive-sync-plugin) | 0.1.0 | 需要自己获批的阿里云盘应用，再扫码授权 |
 | [WebDAV 文件桥](projects/xiaomi-webdav-plugin) | 0.2.0-rc5 | 测试版；多账号、多目录授权、远程单向备份、目录新建与原位改名 |
+| [qB 下载](projects/xiaomi-qbittorrent-plugin) | 0.1.0-rc1 | 开发候选版；磁力/种子、进度、暂停继续、限速；首次初始化下载独立镜像，尚未完成真机下载验收 |
 | [精速 ERP 入口示例](projects/xiaomi-erp-link-plugin) | 源码示例 | 自行配置网页上游地址和 NAS 用户；未纳入一键安装列表，不附 ERP 系统或业务数据 |
 | 夸克网盘 | 未发布 | 目前没有可用实现，不提供空壳安装按钮 |
 
@@ -37,6 +38,7 @@ Mac 如果拦截未签名的 `.command`，在终端运行 `bash install.sh`；�
 - 不承诺官方 OTA 后入口与服务始终存在。WebDAV 会检查环境和目录身份；异常时拒绝共享，不自动放宽权限。
 - 当前是随安装包分发的签名仓库快照；不会自动从 GitHub 拉取更新。更新市场请下载新安装包重新运行。自定义远程来源入口尚未开放。
 - 不附带 root 获取工具、个人密钥、云盘令牌、NAS 配置、公司 ERP 或同步数据。
+- qB 下载候选版未部署到维护者的 NAS；本地测试通过不等于 Mac/手机客户端、RP05 容器启动及真实下载已验收。
 
 ## 开发与贡献
 

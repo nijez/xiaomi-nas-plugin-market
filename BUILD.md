@@ -25,7 +25,7 @@ python3 scripts/build.py --signing-key "$HOME/plugin-market-signing.pem"
 python3 scripts/verify_release.py
 ```
 
-输出在 `artifacts/`，包含跨平台安装 ZIP、4 个签名插件包、公钥及 SHA256SUMS.txt。默认保留已有输出，避免混入旧包；换一次性干净工作目录构建新版本。
+输出在 `artifacts/`，包含跨平台安装 ZIP、5 个签名插件包、公钥及 SHA256SUMS.txt。默认保留已有输出，避免混入旧包；也可通过 `--output artifacts/v0.1.2-beta.1` 选择新的构建目录，再用 `verify_release.py --artifacts artifacts/v0.1.2-beta.1` 验证。
 
 自己的签名密钥不是本仓库维护者密钥。自行构建相当于创建新的信任来源，必须向使用者单独说明公钥指纹；不要冒充原发布包。
 

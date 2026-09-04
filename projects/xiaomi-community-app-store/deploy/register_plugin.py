@@ -61,7 +61,7 @@ def main() -> int:
             "plugin": PLUGIN_KEY,
             "name": "插件市场",
             "id": args.plugin_id,
-            "version": "0.1.1",
+            "version": "0.1.2",
             "tags": ["store", "community"],
             "desc": "安装、更新和管理经过签名的社区插件",
             "developer": "Kingwell Community",

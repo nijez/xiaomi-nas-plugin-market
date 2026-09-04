@@ -1,5 +1,6 @@
 """Release privacy, ZIP, signature and checksum checks; no network or NAS writes."""
 import hashlib
+import argparse
 import io
 import json
 import re
@@ -18,10 +19,10 @@ PATTERNS = {
     'personal macOS path': rb'/Users/[A-Za-z0-9_-]+/',
     'private device address': rb'\b10\.0\.0\.[0-9]{1,3}\b',
     'device certificate identity': rb'nas\.[0-9]{5,}\.[a-f0-9]{32,}',
-    'GitHub token': rb'(?:ghp_|github_pat_)[A-Za-z0-9_]{25,}',
+    'GitHub token': rb'(?:gh[pousr]_|github_pat_)[A-Za-z0-9_]{25,}',
     'API token': rb'sk-[A-Za-z0-9_-]{32,}',
 }
-FORBIDDEN = {'secrets', '.env', 'admin-token', 'session.key', 'permissions.json', 'config.json',
+FORBIDDEN = {'secrets', '.env', 'admin-token', 'session.key', 'permissions.json', 'config.json', 'settings.json',
              'nas-root-key', 'signing-key.pem', 'ca.key', 'server.key'}
 EXCLUDED = {'.git', '__pycache__', 'node_modules', 'test-results', 'artifacts'}
 findings = []
@@ -63,6 +64,9 @@ def inspect(name, body, depth=0):
 
 
 def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--artifacts', type=Path, default=ROOT / 'artifacts')
+    args = parser.parse_args()
     files = 0
     for file in ROOT.rglob('*'):
         relative = file.relative_to(ROOT)
@@ -72,7 +76,7 @@ def main():
             continue
         inspect(relative.as_posix(), file.read_bytes())
         files += 1
-    artifacts = ROOT / 'artifacts'
+    artifacts = args.artifacts.resolve()
     for line in (artifacts / 'SHA256SUMS.txt').read_text().splitlines():
         digest, name = line.split('  ', 1)
         assert '/' not in name and '\\' not in name
@@ -82,7 +86,7 @@ def main():
     catalog = artifacts / 'catalog'
     key = catalog / 'repository-public.pem'
     packages = load_verified_catalog(catalog, key)['packages']
-    assert len(packages) == 4
+    assert {p['id'] for p in packages} == {'devicemanager', '115sync', 'aliyundrivesync', 'webdav', 'qbittorrent'}
     for package in packages:
         bundle = catalog / package['bundle']
         assert hashlib.sha256(bundle.read_bytes()).hexdigest() == package['sha256']

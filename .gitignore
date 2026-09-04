@@ -16,3 +16,4 @@
 **/*private_key.pem
 **/session.key
 **/admin-token
+**/settings.json

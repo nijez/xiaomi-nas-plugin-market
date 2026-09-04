@@ -48,7 +48,7 @@ fi
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
 REMOTE="root@${NAS_IP}"
-RELEASE_ID="0.1.1-$(date +%Y%m%d%H%M%S)"
+RELEASE_ID="0.1.2-$(date +%Y%m%d%H%M%S)"
 REMOTE_RELEASE="/data/plugin/community-store/releases/${RELEASE_ID}"
 TMP_SERVICE="$(mktemp -t xiaomi-community-store-service.XXXXXX)"
 trap 'rm -f "${TMP_SERVICE}"' EXIT

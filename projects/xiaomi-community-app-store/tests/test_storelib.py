@@ -25,7 +25,7 @@ PUBLIC_KEY = CATALOG / "repository-public.pem"
 class StoreLibraryTests(unittest.TestCase):
     def test_catalog_and_all_bundles_verify(self) -> None:
         catalog = load_verified_catalog(CATALOG, PUBLIC_KEY)
-        self.assertEqual(4, len(catalog["packages"]))
+        self.assertEqual({'devicemanager', '115sync', 'aliyundrivesync', 'webdav', 'qbittorrent'}, {p['id'] for p in catalog['packages']})
         for package in catalog["packages"]:
             verify_detached_signature(
                 CATALOG / package["bundle"],

@@ -60,7 +60,7 @@ class ServerAuthTests(unittest.TestCase):
         cookie = headers["Set-Cookie"].split(";", 1)[0]
         status, _, payload = self.request("GET", "/api/catalog", headers={"X-Community-Session": session})
         self.assertEqual(200, status)
-        self.assertEqual(4, len(json.loads(payload)["catalog"]["packages"]))
+        self.assertEqual(5, len(json.loads(payload)["catalog"]["packages"]))
 
         self.server.shutdown()
         self.server.server_close()
