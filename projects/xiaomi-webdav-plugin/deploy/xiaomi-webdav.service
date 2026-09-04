@@ -1,0 +1,27 @@
+[Unit]
+Description=Xiaomi WebDAV File Bridge
+After=network.target nginx.service
+
+[Service]
+Type=simple
+WorkingDirectory=/data/plugin/webdav/current
+Environment=NAS_USER_ID=__NAS_USER_ID__
+Environment=DATA_DIR=/data/plugin/webdav/data
+Environment=LOCAL_ROOT=/nas/pool0/__NAS_USER_ID__/data
+Environment=PORT=18120
+ExecStart=/usr/bin/python3 /data/plugin/webdav/current/server.py
+Restart=on-failure
+RestartSec=5
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectHome=true
+ProtectSystem=full
+MemoryMax=320M
+TasksMax=64
+Nice=10
+KillMode=control-group
+TimeoutStopSec=20
+
+[Install]
+WantedBy=multi-user.target

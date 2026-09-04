@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover" />
+    <meta name="csrf-token" content="__CSRF_TOKEN__" />
+    <meta name="session-token" content="__SESSION_TOKEN__" />
+    <title>插件市场</title>
+    <link rel="stylesheet" href="styles.css?v=0.1.1" />
+  </head>
+  <body>
+    <header class="topbar">
+      <button class="icon-button" id="backButton" aria-label="返回" title="返回">
+        <span aria-hidden="true">‹</span>
+      </button>
+      <div class="brand">
+        <div class="store-mark" aria-hidden="true"><i></i><i></i><i></i></div>
+        <div><strong>插件市场</strong><small>第三方插件 · 非小米官方</small></div>
+      </div>
+      <button class="icon-button refresh" id="refreshButton" aria-label="刷新" title="刷新">
+        <span aria-hidden="true">↻</span>
+      </button>
+    </header>
+
+    <main>
+      <section class="intro">
+        <div>
+          <p class="eyebrow">为小米智能存储扩展能力</p>
+          <h1>插件市场</h1>
+        </div>
+        <div class="trust"><span class="shield" aria-hidden="true">✓</span><span>签名已验证</span></div>
+      </section>
+
+      <nav class="tabs" aria-label="插件视图">
+        <button class="tab active" data-view="featured">精选</button>
+        <button class="tab" data-view="installed">已安装</button>
+        <button class="tab" data-view="sources">来源</button>
+      </nav>
+
+      <section id="featuredView" class="view active">
+        <div class="section-heading"><h2>可用插件</h2><span id="updatedAt">正在读取仓库</span></div>
+        <div id="packageList" class="package-grid" aria-live="polite"></div>
+      </section>
+
+      <section id="installedView" class="view">
+        <div class="section-heading"><h2>已安装</h2><span>数据默认保留</span></div>
+        <div id="installedList" class="package-grid"></div>
+      </section>
+
+      <section id="sourcesView" class="view">
+        <div class="source-band">
+          <div class="source-icon" aria-hidden="true">K</div>
+          <div class="source-copy"><strong>Kingwell Community</strong><small>内置可信源 · ECDSA P-256</small></div>
+          <span class="source-state">已启用</span>
+        </div>
+        <button class="add-source" disabled><span aria-hidden="true">＋</span>添加签名源</button>
+        <p class="source-note">自定义源会在公钥指纹确认流程完成后开放。</p>
+      </section>
+    </main>
+
+    <div id="toast" class="toast" role="status" aria-live="polite"></div>
+    <script src="app.js?v=0.1.1" defer></script>
+  </body>
+</html>

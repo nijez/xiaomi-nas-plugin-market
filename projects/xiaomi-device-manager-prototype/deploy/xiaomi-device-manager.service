@@ -1,0 +1,25 @@
+[Unit]
+Description=Xiaomi Device Manager
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=/data/plugin/xiaomi-device-manager/current
+Environment=HOST=127.0.0.1
+Environment=PORT=18080
+Environment=STATIC_DIR=/data/plugin/xiaomi-device-manager/current/public
+Environment=POOL_MOUNT=/nas/pool0
+Environment=DOCKER_BIN=/data/docker/docker
+Environment=SMARTCTL_BIN=/usr/sbin/smartctl
+Environment=HISTORY_FILE=/data/plugin/xiaomi-device-manager/history.json
+Environment=SAMPLE_INTERVAL=60
+Environment=MAX_HISTORY_POINTS=1440
+Environment=CPU_SAMPLE_WINDOW=1.0
+Environment=DRIVE_HEALTH_TTL=300
+Environment=DOCKER_STATS_TTL=10
+ExecStart=/usr/bin/python3 /data/plugin/xiaomi-device-manager/current/server.py
+Restart=on-failure
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target

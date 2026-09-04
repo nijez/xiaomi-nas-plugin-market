@@ -1,0 +1,43 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://community.xiaomi-nas.local/schemas/plugin-manifest-v1.json",
+  "title": "Xiaomi NAS Community Plugin Bundle",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "id",
+    "name",
+    "version",
+    "pluginId",
+    "port",
+    "paths",
+    "service",
+    "nginx",
+    "healthPath",
+    "registry"
+  ],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]{2,39}$" },
+    "name": { "type": "string", "minLength": 1, "maxLength": 40 },
+    "version": { "type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+(?:[-+][A-Za-z0-9.-]+)?$" },
+    "pluginId": { "type": "integer", "minimum": 1 },
+    "port": { "type": "integer", "minimum": 1024, "maximum": 65535 },
+    "paths": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["releaseRoot", "uiKey", "iconName"],
+      "properties": {
+        "releaseRoot": { "type": "string", "pattern": "^/data/plugin/[a-z0-9-]+$" },
+        "uiKey": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]{2,39}$" },
+        "iconName": { "type": "string", "pattern": "^[A-Za-z0-9._-]+\\.icon$" }
+      }
+    },
+    "service": { "type": "string", "pattern": "^[a-z0-9-]+\\.service$" },
+    "nginx": { "type": "string", "pattern": "^[a-z0-9-]+\\.conf$" },
+    "healthPath": { "type": "string", "pattern": "^/[A-Za-z0-9_./?=&-]*$" },
+    "requirements": { "type": "string", "pattern": "^runtime/[A-Za-z0-9._/-]+$" },
+    "registry": { "type": "object" }
+  }
+}

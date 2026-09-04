@@ -1,0 +1,5 @@
+# Preserve integrity-checked bytes on Windows and macOS checkouts.
+* -text
+projects/xiaomi-webdav-plugin/vendor/** -diff linguist-vendored
+projects/*/web/vendor/** linguist-vendored
+projects/xiaomi-device-manager-prototype/dist/** linguist-generated

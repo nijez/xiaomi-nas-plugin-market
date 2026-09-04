@@ -1,0 +1,183 @@
+'use strict';
+const $ = (s) => document.querySelector(s);
+const session = $('meta[name="webdav-session"]').content;
+const csrf = $('meta[name="csrf-token"]').content;
+let state, toastTimer, browseTarget, browsePath = '', browseGeneration = 0, folderEdit;
+let browseOpenTimer, cancelFolderRename;
+const escapeHTML = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+// Dynamic relative image URLs resolve against the Mac host shell, not this plugin.
+const icon = (name) => `<img src="${window.WEBDAV_ICON_ASSETS[name]}" alt="">`;
+const button = (action, id, title, image) => `<button class="icon" data-action="${action}" data-id="${id}" title="${title}" aria-label="${title}">${icon(image)}</button>`;
+function toast(message) { $('#toast').textContent = message; $('#toast').hidden = false; clearTimeout(toastTimer); toastTimer = setTimeout(() => $('#toast').hidden = true, 6500); }
+async function api(route, body) {
+  const response = await fetch('api/' + route, {method: body === undefined ? 'GET' : 'POST', cache:'no-store', headers:{'X-WebDAV-Session':session, 'X-CSRF-Token':csrf, ...(body === undefined ? {} : {'Content-Type':'application/json'})}, body:body === undefined ? undefined : JSON.stringify(body)});
+  const result = await response.json();
+  if (!response.ok || !result.ok) throw new Error(result.error || '请求失败');
+  return result;
+}
+function fields(form) { const data = Object.fromEntries(new FormData(form)); for (const el of form.querySelectorAll('[type=checkbox]')) data[el.name] = el.checked; return data; }
+function fill(form, values) { form.reset(); for(const [key,value] of Object.entries(values)) { const el = form.elements.namedItem(key); if (el) { if(el.type === 'checkbox') el.checked = value; else el.value = value ?? ''; } } }
+function validateSharePassword() {
+  const input = $('#shareForm').elements.password;
+  const value = input.value;
+  let error = '';
+  if (!value) error = state?.share.hasPassword ? '' : '请先设置共享密码';
+  else if (Array.from(value).length < 8 || Array.from(value).length > 200 || /[\x00-\x1f\x7f]/.test(value)) error = '共享密码须为 8 至 200 个字符，不能包含控制字符';
+  else if ([/[A-Z]/, /[a-z]/, /[0-9]/, /[!-/:-@\[-`{-~]/].filter(pattern => pattern.test(value)).length < 2) error = '共享密码须包含英文大写、英文小写、数字、半角符号中的至少两种';
+  input.setCustomValidity(error);
+  return !error;
+}
+const statuses = {idle:'待执行',running:'运行中',success:'已完成',failed:'失败',cancelled:'已停止',interrupted:'已中断'};
+function bytes(value) { value = Number(value || 0); return value >= 1073741824 ? (value/1073741824).toFixed(2)+' GiB' : value >= 1048576 ? (value/1048576).toFixed(1)+' MiB' : (value/1024).toFixed(1)+' KiB'; }
+function date(value) { return value ? new Date(value*1000).toLocaleString('zh-CN',{month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'}) : ''; }
+function render(editShare=false) {
+  const s=state.share;
+  $('#summary').textContent = `${s.running || state.access?.running ? '共享已开启' : '共享未开启'} · ${state.activeId ? '1 个任务运行中' : '暂无运行任务'}`;
+  $('#shareLocked').hidden=!s.enabled;
+  $('#remoteCount').textContent=state.remotes.length; $('#jobCount').textContent=state.jobs.length;
+  $('#shareState').textContent=s.running ? '运行中' : '已关闭'; $('#shareState').classList.toggle('live',s.running);
+  $('#toggleShare').textContent=s.enabled ? '关闭共享' : '开启共享'; $('#shareError').textContent=s.error;
+  if(editShare) fill($('#shareForm'),{path:s.path,username:s.username,readOnly:s.readOnly});
+  validateSharePassword();
+  for(const el of $('#shareForm').elements) if(el.id !== 'toggleShare') el.disabled=s.enabled;
+  $('#writeWarning').hidden=$('#shareForm').elements.readOnly.checked;
+  $('#shareUrls').innerHTML=s.running ? s.urls.map(url=>`<div class="url-row"><code>${escapeHTML(url)}</code><button class="icon" data-copy="${escapeHTML(url)}" title="复制地址">${icon('copy')}</button></div>`).join('') : '开启共享后可连接';
+  $('#certificate').disabled=!s.certificateReady;
+  $('#remoteList').innerHTML=state.remotes.length ? state.remotes.map(r=>`<article class="record"><div class="record-icon">${icon('link')}</div><div class="record-info"><h3>${escapeHTML(r.name)}</h3><p>${escapeHTML(r.url)}</p><p>${escapeHTML(r.username)} · ${r.allowHttp ? 'HTTP 明文' : 'HTTPS'}</p></div><div class="actions">${button('test',r.id,'测试连接','reload')}${button('editRemote',r.id,'编辑连接','edit')}${button('removeRemote',r.id,'移除连接','trash')}</div></article>`).join('') : `<div class="empty">${icon('link')}<h3>暂无远程连接</h3></div>`;
+  $('#addJob').disabled=!state.remotes.length;
+  $('#jobList').innerHTML=state.jobs.length ? state.jobs.map(j=>{
+    const remote=state.remotes.find(r=>r.id===j.remoteId); const running=j.id===state.activeId; const p=state.progress;
+    return `<article class="record"><div class="record-icon">${icon(j.direction==='upload'?'upload':'download')}</div><div class="record-info"><h3>${escapeHTML(j.name)}</h3><p>${j.direction==='upload'?'上传':'下载'} · ${escapeHTML(remote?.name)} · ${j.interval?'每 '+j.interval+' 分钟':'仅手动'}</p><p>NAS /${escapeHTML(j.local)} ↔ 远程 /${escapeHTML(j.remote)}</p><p class="state">${statuses[j.status] || j.status}${j.finishedAt?' · '+date(j.finishedAt):''}${j.nextRun?' · 下次 '+date(j.nextRun):''}</p>${running?`<progress ${p.totalBytes?`value="${p.bytes}" max="${p.totalBytes}"`:''}></progress><p>${bytes(p.bytes)} / ${bytes(p.totalBytes)} · ${bytes(p.speed)}/s</p>`:''}${j.error?`<p class="error">${escapeHTML(j.error)}</p>`:''}</div><div class="actions">${running?button('cancel',j.id,'停止任务','stop'):button('run',j.id,'立即运行','play')}${button('editJob',j.id,'编辑任务','edit')}${button('removeJob',j.id,'移除任务','trash')}</div></article>`;
+  }).join('') : `<div class="empty">${icon('transfer')}<h3>${state.remotes.length?'暂无备份任务':'请先添加远程 WebDAV 连接'}</h3>${state.remotes.length?'':'<button type="button" id="goRemotes">添加远程连接</button>'}</div>`;
+  window.renderAccess?.();
+}
+let refreshing=false;
+async function refresh(edit=false) { if(refreshing) return; refreshing=true; try { state=await api('status'); render(edit); } finally {refreshing=false;} }
+async function act(route,body) { await api(route,body); await refresh(route.startsWith('share/')); }
+async function busy(button, callback) { if(button?.disabled)return; if(button)button.disabled=true; try { await callback(); } catch(e) {toast(e.message || '操作失败');} finally {if(button?.isConnected)button.disabled=false;} }
+document.addEventListener('click',async event=>{
+  const b=event.target.closest('button'); if(!b)return;
+  if(b.dataset.tab) { document.querySelectorAll('.tabs button').forEach(x=>x.classList.toggle('selected',x===b)); document.querySelectorAll('.panel').forEach(x=>x.hidden=x.id!==b.dataset.tab); }
+  if(b.dataset.close)$('#'+b.dataset.close).close();
+  if(b.id==='goRemotes') $('[data-tab="remotes"]').click();
+  if(b.dataset.copy) { try { await navigator.clipboard.writeText(b.dataset.copy); toast('地址已复制'); } catch {toast('当前客户端不支持剪贴板，请长按地址复制');} }
+  if(b.dataset.browse) {browseTarget=b.dataset.browse; const [f,key]=browseField(); browsePath=f.elements[key].value; $('#browseDialog').showModal(); await loadFolders();}
+  if(!b.dataset.action)return;
+  const id=b.dataset.id;
+  await busy(b,async()=>{
+    switch(b.dataset.action) {
+      case 'test': await api('browse?location=remote&id='+encodeURIComponent(id)); toast('连接成功，可以读取远程目录'); break;
+      case 'editRemote': fill($('#remoteForm'),state.remotes.find(r=>r.id===id)); $('#remoteDialog').showModal(); break;
+      case 'removeRemote': if(confirm('移除连接配置？不会删除远程文件。'))await act('remote/remove',{id}); break;
+      case 'editJob': openJob(state.jobs.find(j=>j.id===id)); break;
+      case 'removeJob': if(confirm('移除任务？已传输的文件和历史版本都会保留。'))await act('job/remove',{id}); break;
+      case 'run': await act('job/run',{id}); break;
+      case 'cancel': await act('job/cancel',{id}); break;
+    }
+  });
+});
+$('#refresh').onclick=()=>busy($('#refresh'),()=>refresh());
+$('#addRemote').onclick=()=>{fill($('#remoteForm'),{});$('#httpWarning').hidden=true;$('#remoteDialog').showModal();};
+$('#remoteForm').elements.allowHttp.onchange=e=>$('#httpWarning').hidden=!e.target.checked;
+$('#shareForm').elements.readOnly.onchange=e=>$('#writeWarning').hidden=e.target.checked;
+$('#shareForm').elements.password.oninput=validateSharePassword;
+function openJob(job={}) {const form=$('#jobForm');form.elements.remoteId.innerHTML=state.remotes.map(r=>`<option value="${r.id}">${escapeHTML(r.name)}</option>`).join('');fill(form,job);$('#jobDialog').showModal();}
+$('#addJob').onclick=()=>openJob();
+for (const [id,route,dialog] of [['remoteForm','remote/save','remoteDialog'],['jobForm','job/save','jobDialog'],['shareForm','share/save',null]]) {
+  $('#'+id).onsubmit=event=>{event.preventDefault();const form=event.target;if(id==='shareForm'&&!validateSharePassword()){form.reportValidity();return;}busy(form.querySelector('[type=submit]'),async()=>{await act(route,fields(form));if(dialog)$('#'+dialog).close();if(id==='shareForm')form.elements.password.value='';toast('设置已保存');});};
+}
+$('#toggleShare').onclick=()=>busy($('#toggleShare'),async()=>{if(!state.share.enabled&&!state.share.hasPassword)throw new Error('请先保存共享设置和密码');await act(state.share.enabled?'share/stop':'share/start',{});});
+$('#certificate').onclick=()=>busy($('#certificate'),async()=>{const response=await fetch('api/certificate',{headers:{'X-WebDAV-Session':session}});if(!response.ok)throw new Error('证书下载失败');const url=URL.createObjectURL(await response.blob());const a=document.createElement('a');a.href=url;a.download='nas-webdav-ca.crt';a.click();setTimeout(()=>URL.revokeObjectURL(url),60000);});
+async function loadFolders() {
+  clearTimeout(browseOpenTimer);cancelFolderRename?.();$('#browseError').textContent='';
+  const generation=++browseGeneration; $('#folders').innerHTML='<p>读取目录中…</p>';$('#chooseFolder').disabled=true;$('#up').disabled=true;
+  const remote=browseTarget==='job-remote'; $('#browseTitle').textContent=remote?'选择远程目录':'选择 NAS 目录'; $('#currentPath').textContent='/'+browsePath;
+  $('#createFolder').hidden=remote; $('#createFolder').disabled=true;
+  try {
+    const query=new URLSearchParams({location:remote?'remote':'local',path:browsePath,id:remote?$('#jobForm').elements.remoteId.value:''});
+    const result=await api('browse?'+query);if(generation!==browseGeneration)return;
+    $('#folders').replaceChildren();
+    for(const item of result.items){
+      const row=document.createElement('div');row.className='folder-row';
+      const b=document.createElement('button');b.className='folder-open';b.innerHTML=icon('folder')+'<span class="folder-name">'+escapeHTML(item.name)+'</span>';row.append(b);
+      let lastNameTap=0;
+      const open=()=>{if(generation===browseGeneration && $('#browseDialog').open){browsePath=item.path;loadFolders();}};
+      b.onclick=event=>{
+        clearTimeout(browseOpenTimer);
+        if(remote || event.detail===0 || !event.target.closest('.folder-name')){open();return;}
+        const now=performance.now();
+        if(lastNameTap && now-lastNameTap<450){lastNameTap=0;startFolderRename(row,b,item);return;}
+        lastNameTap=now;browseOpenTimer=setTimeout(open,450);
+      };
+      if(!remote){
+        b.ondblclick=event=>{if(event.target.closest('.folder-name')){clearTimeout(browseOpenTimer);startFolderRename(row,b,item);}};
+        b.onkeydown=event=>{if(event.key==='F2'){event.preventDefault();startFolderRename(row,b,item);}};
+      }
+      $('#folders').append(row);
+    }
+    if(!result.items.length)$('#folders').innerHTML='<p>没有子目录</p>';
+    $('#chooseFolder').disabled=!remote&&!browsePath;
+    $('#createFolder').disabled=remote;
+  } catch(e) {if(generation===browseGeneration)$('#folders').textContent=e.message;} finally {if(generation===browseGeneration)$('#up').disabled=!browsePath;}
+}
+function startFolderRename(row,button,item) {
+  clearTimeout(browseOpenTimer);
+  if(row.querySelector('input'))return;
+  cancelFolderRename?.();$('#browseError').textContent='';
+  if(item.renameBlocked){$('#browseError').textContent=item.renameBlocked;return;}
+  const generation=browseGeneration;
+  const form=document.createElement('form');form.className='folder-inline-form';
+  form.innerHTML=icon('folder');
+  const input=document.createElement('input');input.value=item.name;input.required=true;input.maxLength=255;
+  input.setAttribute('aria-label','文件夹名称');input.autocomplete='off';input.enterKeyHint='done';form.append(input);
+  let saving=false;
+  const controls=['#chooseFolder','#up','#createFolder'].map(selector=>[$(selector),$(selector).disabled]);
+  controls.forEach(([el])=>el.disabled=true);
+  const cancel=()=>{
+    if(cancelFolderRename!==cancel)return;
+    cancelFolderRename=null;form.replaceWith(button);controls.forEach(([el,disabled])=>el.disabled=disabled);
+  };
+  cancelFolderRename=cancel;button.replaceWith(form);
+  $('#browseError').textContent='改名后，其他应用保存的旧路径不会自动更新。';
+  input.onkeydown=event=>{
+    if(event.key==='Escape'&&!saving){event.preventDefault();event.stopPropagation();cancel();button.focus();$('#browseError').textContent='';}
+    if(event.key==='Enter'&&event.isComposing)event.preventDefault();
+  };
+  input.onblur=()=>{if(!saving){cancel();$('#browseError').textContent='';}};
+  form.onsubmit=async event=>{
+    event.preventDefault();if(saving)return;
+    if(input.value===item.name){cancel();button.focus();$('#browseError').textContent='';return;}
+    saving=true;input.readOnly=true;form.setAttribute('aria-busy','true');
+    try{
+      await api('folder/rename',{path:item.path,name:input.value});
+      if(generation===browseGeneration && $('#browseDialog').open){cancel();await loadFolders();$('#browseError').textContent='文件夹已重命名';}
+    }catch(e){if(generation===browseGeneration && form.isConnected){$('#browseError').textContent=e.message;input.focus();}}
+    finally{saving=false;input.readOnly=false;form.removeAttribute('aria-busy');}
+  };
+  input.focus();input.select();
+}
+$('#browseDialog').addEventListener('close',()=>{clearTimeout(browseOpenTimer);cancelFolderRename?.();browseGeneration++;});
+function openFolderEdit(item=null) {
+  folderEdit={action:item?'rename':'create',path:item?item.path:browsePath};
+  const form=$('#folderEditForm');form.reset();form.elements.name.value=item?.name || '';
+  $('#folderEditTitle').textContent=item?'重命名文件夹':'新建文件夹';
+  $('#folderEditPath').textContent='/'+folderEdit.path;
+  $('#folderRenameWarning').hidden=!item;$('#folderEditError').textContent='';$('#browseError').textContent='';
+  $('#saveFolder').textContent=item?'确认重命名':'创建';
+  $('#folderEditDialog').showModal();form.elements.name.focus();form.elements.name.select();
+}
+$('#createFolder').onclick=()=>openFolderEdit();
+$('#folderEditForm').onsubmit=async event=>{
+  event.preventDefault();const save=$('#saveFolder');if(save.disabled)return;
+  save.disabled=true;$('#folderEditError').textContent='';
+  try{
+    await api('folder/'+folderEdit.action,{path:folderEdit.path,name:event.target.elements.name.value});
+    $('#folderEditDialog').close();await loadFolders();
+    $('#browseError').textContent=folderEdit.action==='create'?'文件夹已创建':'文件夹已重命名';
+  }catch(e){$('#folderEditError').textContent=e.message;}finally{save.disabled=false;}
+};
+$('#up').onclick=()=>{browsePath=browsePath.split('/').slice(0,-1).join('/');loadFolders();};
+function browseField(){return browseTarget==='share'?[$('#shareForm'),'path']:browseTarget==='access-folder'?[$('#accessFolderForm'),'path']:[$('#jobForm'),browseTarget==='job-local'?'local':'remote'];}
+$('#chooseFolder').onclick=()=>{const [f,key]=browseField();f.elements[key].value=browsePath;$('#browseDialog').close();};
+refresh(true).catch(e=>{ $('#summary').textContent='连接未建立';toast(e.message); });
+setInterval(()=>{if(!document.hidden&&!document.querySelector('dialog[open]'))refresh().catch(()=>{});},5000);

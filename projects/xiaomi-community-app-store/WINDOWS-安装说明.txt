@@ -1,0 +1,54 @@
+小米智能存储插件市场 - Windows 安装说明
+=========================================
+
+适用条件
+--------
+1. 小米智能存储已经通过可信流程开启 root 密钥 SSH。
+2. Windows 电脑与 NAS 在同一个局域网。
+3. 电脑上保存着这台 NAS 自己的 root SSH 私钥。
+4. Windows 已安装“OpenSSH 客户端”。
+
+重要安全提醒
+------------
+- 每个人必须使用自己 NAS 生成的 SSH 私钥。
+- 不要向别人索要或发送 SSH 私钥、客户端证书、管理令牌。
+- 本安装包不会帮未 root 的设备获取 root 权限。
+
+安装步骤
+--------
+1. 将整个 ZIP 解压到一个普通文件夹，不要直接在压缩包里运行。
+2. 双击“install-windows.cmd”。
+3. 按提示输入 NAS 当前局域网 IP，例如 192.168.31.100。
+4. 安装器会自动寻找以下私钥：
+   %USERPROFILE%\.xiaomi-nas-root\nas-root-key
+   %USERPROFILE%\.ssh\xiaomi-nas-root
+   %USERPROFILE%\.ssh\nas-root-key
+5. 如果没有自动找到，输入这台 NAS 的 root SSH 私钥完整路径。
+6. 如果 NAS 上有多个小米账号，按提示选择当前账号。
+7. 看到“插件市场已安装”后，完全退出并重新打开小米智能存储客户端。
+8. 在“全部应用/基础应用”中打开“插件市场”，再选择需要的插件安装。
+
+Windows 没有 OpenSSH 客户端
+---------------------------
+打开“设置 -> 系统 -> 可选功能 -> 查看功能”，搜索并安装
+“OpenSSH 客户端”，然后重新运行 install-windows.cmd。
+
+常见问题
+--------
+1. 提示 SSH 私钥不存在：确认输入的是私钥文件，不是 .pub 公钥文件。
+2. 提示 Permission denied：确认 NAS 已开启密钥 SSH，并且该私钥与 NAS
+   上的 authorized_keys 匹配。
+3. 安装成功但看不到图标：完全退出小米智能存储客户端后重新打开。
+4. NAS IP 变化：商店安装完成后不受 DHCP 地址变化影响；重新安装时才需要
+   输入当前 IP。
+
+校验发布包
+----------
+在 ZIP 所在目录打开 PowerShell，运行：
+
+Get-FileHash .\xiaomi-plugin-market-0.1.1.zip -Algorithm SHA256
+
+将输出与一同发布的 SHA256SUMS.txt 比对，一致后再解压安装。
+
+此版本尚未在实体 Windows 10/11 上完成安装验收。115 和阿里云盘需要
+各自已批准的 App ID；WebDAV 多用户版本标记为测试版，使用前备份配置。

@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="webdav-session" content="__SESSION_TOKEN__">
+  <meta name="csrf-token" content="__CSRF_TOKEN__">
+  <title>WebDAV 文件桥</title>
+  <link rel="icon" href="assets/webdav.png">
+  <link rel="stylesheet" href="styles.css?v=0.2.0-rc5">
+  <script src="icon-assets.js?v=0.1.1" defer></script>
+  <script src="app.bundle.js?v=0.2.0-rc5" defer></script>
+</head>
+<body>
+  <div class="webdav-app">
+  <header class="topbar"><div class="brand"><img src="assets/webdav.png" width="42" height="42" alt=""><div><strong>WebDAV 文件桥</strong><span>文件共享与备份</span></div></div><button class="icon" id="refresh" title="刷新" aria-label="刷新"><img src="assets/reload.png" alt=""></button></header>
+  <main>
+    <div class="heading"><div><h1>文件连接</h1><p id="summary">正在读取服务状态</p></div><span class="badge">本机运行</span></div>
+    <nav class="tabs" aria-label="功能"><button data-tab="share" class="selected">NAS 共享</button><button data-tab="access">用户与权限</button><button data-tab="remotes">远程连接 <span id="remoteCount">0</span></button><button data-tab="jobs">备份任务 <span id="jobCount">0</span></button></nav>
+    <section id="share" class="panel">
+      <div class="section-title"><h2>单账号共享</h2><span id="shareState" class="status">未开启</span></div>
+      <p class="notice" id="shareLocked" hidden>共享已开启，目录与账号设置已锁定。关闭共享后可修改；关闭会断开当前连接。</p>
+      <div class="share-layout">
+        <form id="shareForm" class="form-block">
+          <label>共享目录<div class="input-action"><input name="path" value="MiShare" required readonly><button type="button" class="icon" data-browse="share" title="选择目录"><img src="assets/folder.png" alt="选择目录"></button></div></label>
+          <div class="pair"><label>用户名<input name="username" value="nas" autocomplete="off" required pattern="[A-Za-z0-9_-]+"></label><label>共享密码<input name="password" type="password" autocomplete="new-password" placeholder="至少 8 位，至少两类字符" aria-describedby="passwordRule"></label></div>
+          <p class="muted" id="passwordRule">8 至 200 个字符，英文大写、英文小写、数字、半角符号中至少两种。已有密码时留空保留。</p>
+          <label class="check"><input name="readOnly" type="checkbox" checked>只读访问</label>
+          <p class="notice" id="writeWarning" hidden>读写模式允许已登录的 WebDAV 客户端修改、覆盖和删除共享目录中的文件。</p>
+          <div class="actions"><button class="primary" type="submit">保存设置</button><button type="button" id="toggleShare">开启共享</button></div>
+          <p class="muted" id="shareError"></p>
+        </form>
+        <aside class="connection-info"><h3>连接信息</h3><dl><dt>协议</dt><dd>HTTPS · TLS 1.2+</dd><dt>地址</dt><dd id="shareUrls">开启共享后可连接</dd><dt>证书</dt><dd><button id="certificate" class="link" disabled>下载本机 CA 证书</button></dd></dl><p class="security">使用本机独立证书，首次连接需在客户端信任该 CA。不关闭证书校验，不修改小米原有 WebDAV。</p></aside>
+      </div>
+    </section>
+    <section id="access" class="panel" hidden>
+      <div class="section-title"><div><h2>多用户共享</h2><p class="muted" id="accessState">未开启</p></div><button id="toggleAccess" class="primary">开启多用户共享</button></div>
+      <p class="notice" id="accessIssue" hidden></p>
+      <p class="notice" id="accessLocked" hidden>共享运行中，修改账号或授权前需关闭多用户共享。关闭会断开当前连接。</p>
+      <div id="accessUrls" class="muted"></div>
+      <div class="access-section"><div class="section-title"><h2>共享目录</h2><button id="addAccessFolder"><img src="assets/plus.png" alt="">添加目录</button></div><div id="accessFolders"></div></div>
+      <div class="access-section"><div class="section-title"><h2>访问账号</h2><button id="addAccessUser"><img src="assets/plus.png" alt="">添加账号</button></div><div id="accessUsers"></div></div>
+      <div class="access-section"><h2>兼容性与配置</h2><p class="muted" id="accessCompatibility"></p><div class="actions"><button id="importLegacy">导入原共享配置</button><button id="acceptHost">确认运行环境</button></div><p class="muted" id="migrationPreview"></p></div>
+    </section>
+    <section id="remotes" class="panel" hidden><div class="section-title"><h2>远程 WebDAV</h2><button id="addRemote" class="primary"><img src="assets/plus.png" alt="">添加连接</button></div><div id="remoteList"></div></section>
+    <section id="jobs" class="panel" hidden><div class="section-title"><h2>上传与下载</h2><button id="addJob" class="primary"><img src="assets/plus.png" alt="">新建任务</button></div><p class="notice">单向复制，不同步删除。被覆盖的旧版本保留在目标目录的 .webdav-history 中，占用目标存储空间。</p><div id="jobList"></div></section>
+    <footer>WebDAV 文件桥 <span>0.2.0-rc5</span></footer>
+  </main>
+  <dialog id="remoteDialog"><form id="remoteForm"><div class="dialog-heading"><h2>远程连接</h2><button type="button" class="icon" data-close="remoteDialog" title="关闭"><img src="assets/close.png" alt="关闭"></button></div><input type="hidden" name="id"><label>连接名称<input name="name" required maxlength="160" placeholder="例如：家里的另一台 NAS"></label><label>WebDAV 地址<input name="url" type="url" required placeholder="https://dav.example.com/dav/"></label><div class="pair"><label>用户名<input name="username" required autocomplete="off"></label><label>密码或应用专用密码<input name="password" type="password" autocomplete="new-password" placeholder="编辑时留空保留"></label></div><label class="check"><input name="allowHttp" type="checkbox">允许 HTTP 明文连接</label><p class="notice" id="httpWarning" hidden>HTTP 会明文发送账号与密码，仅在你信任的隔离网络中使用。</p><div class="actions"><button type="submit" class="primary">保存连接</button></div></form></dialog>
+  <dialog id="jobDialog"><form id="jobForm"><div class="dialog-heading"><h2>备份任务</h2><button type="button" class="icon" data-close="jobDialog" title="关闭"><img src="assets/close.png" alt="关闭"></button></div><input name="id" type="hidden"><label>任务名称<input name="name" required maxlength="160"></label><div class="pair"><label>方向<select name="direction"><option value="upload">NAS → 远程 · 上传</option><option value="download">远程 → NAS · 下载</option></select></label><label>远程连接<select name="remoteId" required></select></label></div><label>NAS 目录<div class="input-action"><input name="local" readonly required value="MiShare"><button type="button" class="icon" data-browse="job-local" title="选择 NAS 目录"><img src="assets/folder.png" alt="选择目录"></button></div></label><label>远程目录<div class="input-action"><input name="remote" placeholder="留空代表 WebDAV 根目录"><button type="button" class="icon" data-browse="job-remote" title="选择远程目录"><img src="assets/folder.png" alt="选择目录"></button></div></label><div class="pair"><label>执行频率<select name="interval"><option value="0">仅手动</option><option value="15">每 15 分钟</option><option value="60">每小时</option><option value="360">每 6 小时</option><option value="1440">每 24 小时</option></select></label><label>限速 (MiB/s)<input name="bandwidth" type="number" min="0" max="1000" value="0"><small>0 为不限速</small></label></div><div class="actions"><button class="primary" type="submit">保存任务</button></div></form></dialog>
+  <dialog id="browseDialog"><div class="dialog-heading"><h2 id="browseTitle">选择目录</h2><button class="icon" data-close="browseDialog" title="关闭"><img src="assets/close.png" alt="关闭"></button></div><div class="browse-path"><button id="up" class="icon" title="上一级"><img src="assets/up.png" alt="上一级"></button><code id="currentPath">/</code></div><div class="folder-toolbar"><button id="createFolder" type="button"><img src="assets/plus.png" alt="">新建文件夹</button></div><p id="browseError" class="folder-feedback" role="status"></p><div id="folders" class="folders"></div><div class="actions"><button id="chooseFolder" class="primary">选择此目录</button></div></dialog>
+  <dialog id="folderEditDialog"><form id="folderEditForm"><div class="dialog-heading"><h2 id="folderEditTitle">新建文件夹</h2><button type="button" class="icon" data-close="folderEditDialog" title="关闭"><img src="assets/close.png" alt="关闭"></button></div><code id="folderEditPath" class="folder-edit-path"></code><label>文件夹名称<input name="name" required maxlength="255" autocomplete="off"></label><p id="folderRenameWarning" class="warning" hidden>改名会改变实际文件路径。其他应用、同步工具及外部链接中的旧路径不会自动更新。</p><p id="folderEditError" class="error" role="alert"></p><div class="actions"><button type="button" data-close="folderEditDialog">取消</button><button id="saveFolder" type="submit" class="primary">创建</button></div></form></dialog>
+  <dialog id="accessFolderDialog"><form id="accessFolderForm"><div class="dialog-heading"><h2>共享目录</h2><button type="button" class="icon" data-close="accessFolderDialog" title="关闭"><img src="assets/close.png" alt="关闭"></button></div><label>目录名称<input name="name" required maxlength="160"></label><label>访问标识<input name="id" required pattern="[A-Za-z0-9_-]{1,48}" maxlength="48" placeholder="例如：documents"><small>仅英文、数字、下划线、短横线；用于连接地址。</small></label><label>NAS 目录<div class="input-action"><input name="path" readonly required><button type="button" class="icon" data-browse="access-folder" title="选择 NAS 目录"><img src="assets/folder.png" alt="选择目录"></button></div></label><div class="actions"><button type="submit" class="primary">保存目录</button></div></form></dialog>
+  <dialog id="accessUserDialog"><form id="accessUserForm"><div class="dialog-heading"><h2>访问账号</h2><button type="button" class="icon" data-close="accessUserDialog" title="关闭"><img src="assets/close.png" alt="关闭"></button></div><label>账号<input name="username" required pattern="[A-Za-z0-9_-]{1,64}" maxlength="64" autocomplete="off"></label><label>独立 WebDAV 密码<input name="password" type="password" autocomplete="new-password" placeholder="已有密码时留空保留"></label><p class="muted">8 至 200 个字符，英文大写、英文小写、数字、半角符号中至少两种。</p><label class="check"><input name="enabled" type="checkbox" checked>启用账号</label><h3>目录权限</h3><div id="grantFields"></div><div class="actions"><button type="submit" class="primary">保存账号</button></div></form></dialog>
+  <div id="toast" role="status" hidden></div>
+  </div>
+</body>
+</html>

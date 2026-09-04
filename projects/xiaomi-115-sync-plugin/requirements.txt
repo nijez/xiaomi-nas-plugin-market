@@ -1,0 +1,19 @@
+# Runtime set verified against Xiaomi NAS Python 3.12 / OpenSSL 3.2.
+# Keep these exact versions so mirror selection cannot silently change the graph.
+oss2==2.19.1
+cryptography==50.0.1
+pyOpenSSL==26.4.0
+requests==2.34.2
+urllib3==2.7.0
+crcmod==1.7
+pycryptodome==3.23.0
+aliyun-python-sdk-core==2.16.1
+aliyun-python-sdk-kms==2.16.5
+six==1.17.0
+cffi==2.1.1
+typing-extensions==4.16.0
+charset-normalizer==3.5.1
+idna==3.19
+certifi==2026.7.22
+jmespath==1.1.0
+pycparser==3.0

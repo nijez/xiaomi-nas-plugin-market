@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <defs>
+    <linearGradient id="background" x1="512" y1="0" x2="512" y2="1024" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#55C4F6"/>
+      <stop offset="0.5" stop-color="#2B98F2"/>
+      <stop offset="1" stop-color="#2472DE"/>
+    </linearGradient>
+    <linearGradient id="mark" x1="512" y1="192" x2="512" y2="792" gradientUnits="userSpaceOnUse">
+      <stop stop-color="white"/>
+      <stop offset="1" stop-color="#DCEEFF"/>
+    </linearGradient>
+    <filter id="markShadow" x="133" y="148" width="758" height="714" filterUnits="userSpaceOnUse">
+      <feDropShadow dx="0" dy="18" stdDeviation="15" flood-color="#0754B5" flood-opacity="0.26"/>
+    </filter>
+  </defs>
+
+  <rect width="1024" height="1024" rx="224" fill="url(#background)"/>
+  <path d="M96 246C194 111 337 66 512 66c172 0 316 46 416 178" fill="none" stroke="white" stroke-opacity="0.13" stroke-width="28" stroke-linecap="round"/>
+
+  <g filter="url(#markShadow)" fill="none" stroke="url(#mark)" stroke-width="74" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M512 208v340"/>
+    <path d="m350 410 162 162 162-162"/>
+    <path d="M236 658v86c0 46 38 84 84 84h384c46 0 84-38 84-84v-86"/>
+  </g>
+  <g fill="none" stroke="white" stroke-opacity="0.45" stroke-width="14" stroke-linecap="round">
+    <path d="M512 198v318"/>
+    <path d="m355 399 157 157 157-157"/>
+    <path d="M246 657v79c0 40 33 73 73 73h386c40 0 73-33 73-73v-79"/>
+  </g>
+</svg>

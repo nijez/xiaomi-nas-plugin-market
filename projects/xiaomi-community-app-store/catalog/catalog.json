@@ -1,0 +1,51 @@
+{
+  "schemaVersion": 1,
+  "name": "小米智能存储插件市场",
+  "generatedAt": 1788526659,
+  "packages": [
+    {
+      "id": "webdav",
+      "name": "WebDAV 文件桥",
+      "version": "0.2.0-rc5",
+      "summary": "NAS HTTPS 文件共享，以及远程 WebDAV 上传、下载与定时备份",
+      "bundle": "bundles/webdav-0.2.0-rc5.bundle.zip",
+      "signature": "bundles/webdav-0.2.0-rc5.bundle.zip.sig",
+      "sha256": "b5b8c46aeda57bac2327b391c1c855edf648a8e31ea0b5e66fc08112b6cd5d29",
+      "icon": "icons/webdav.png",
+      "channel": "candidate"
+    },
+    {
+      "id": "devicemanager",
+      "name": "设备管家",
+      "version": "0.4.1",
+      "summary": "2 秒实时监控系统、网络、磁盘健康与 Docker 容器资源",
+      "bundle": "bundles/devicemanager-0.4.1.bundle.zip",
+      "signature": "bundles/devicemanager-0.4.1.bundle.zip.sig",
+      "sha256": "6bf2687ffcb0e807c5d5e6d51a6d6033f314b1927a95b6c4e2066b66a7d585da",
+      "icon": "icons/devicemanager.png",
+      "channel": "stable"
+    },
+    {
+      "id": "115sync",
+      "name": "115 云备份",
+      "version": "0.1.0",
+      "summary": "使用 115 官方 OpenAPI 同步与备份 NAS 文件",
+      "bundle": "bundles/115sync-0.1.0.bundle.zip",
+      "signature": "bundles/115sync-0.1.0.bundle.zip.sig",
+      "sha256": "e8571a51479e51ed735cfadd1074a1cf432591829df45a799c856b2d7ce1ce43",
+      "icon": "icons/115sync.png",
+      "channel": "stable"
+    },
+    {
+      "id": "aliyundrivesync",
+      "name": "阿里云盘备份",
+      "version": "0.1.0",
+      "summary": "扫码连接阿里云盘并同步 NAS 文件",
+      "bundle": "bundles/aliyundrivesync-0.1.0.bundle.zip",
+      "signature": "bundles/aliyundrivesync-0.1.0.bundle.zip.sig",
+      "sha256": "d7065518a84ef0bc9333a0ec67a769348efa91bc2dce8b58df128ab79be01e9b",
+      "icon": "icons/aliyundrivesync.png",
+      "channel": "stable"
+    }
+  ]
+}

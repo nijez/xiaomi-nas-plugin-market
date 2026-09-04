@@ -1,0 +1,23 @@
+[Unit]
+Description=Jingsu ERP Xiaomi Smart Storage plugin proxy
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=nobody
+Group=nogroup
+Environment=ERP_PROXY_LISTEN_HOST=127.0.0.1
+Environment=ERP_PROXY_LISTEN_PORT=18118
+Environment=ERP_UPSTREAM_HOST=__ERP_UPSTREAM_HOST__
+Environment=ERP_UPSTREAM_PORT=__ERP_UPSTREAM_PORT__
+ExecStart=/usr/bin/python3 /data/plugin/erp-link/current/proxy_server.py
+Restart=on-failure
+RestartSec=3
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+
+[Install]
+WantedBy=multi-user.target

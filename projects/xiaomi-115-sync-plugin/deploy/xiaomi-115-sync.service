@@ -1,0 +1,19 @@
+[Unit]
+Description=Xiaomi 115 Sync
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/data/plugin/115-sync/current
+Environment=HOST=127.0.0.1
+Environment=PORT=18115
+Environment=DATA_DIR=/data/plugin/115-sync/data
+Environment=LOCAL_ROOT=/nas/pool0
+Environment=PYTHONPATH=/data/plugin/115-sync/current/lib
+ExecStart=/usr/bin/python3 /data/plugin/115-sync/current/server.py
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

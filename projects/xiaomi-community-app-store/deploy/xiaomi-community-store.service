@@ -1,0 +1,21 @@
+[Unit]
+Description=Xiaomi Community Application Store
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/data/plugin/community-store/current
+Environment=HOST=127.0.0.1
+Environment=PORT=18119
+Environment=NAS_USER_ID=__NAS_USER_ID__
+Environment=BASE_PATH=/plugin/__URL_USER_ID__/communitystore/
+Environment=ADMIN_TOKEN_FILE=/data/plugin/community-store/admin-token
+ExecStart=/usr/bin/python3 /data/plugin/community-store/current/server.py
+Restart=on-failure
+RestartSec=5
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target
