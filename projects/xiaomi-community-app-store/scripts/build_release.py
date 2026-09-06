@@ -8,10 +8,11 @@ import shutil
 import tempfile
 import zipfile
 from pathlib import Path
+from build_repository import assert_catalog_matches_sources
 
 
 PROJECT = Path(__file__).resolve().parents[1]
-VERSION = "0.1.2"
+VERSION = "0.1.3"
 DIST = PROJECT / "dist"
 PACKAGE_NAME = f"xiaomi-plugin-market-{VERSION}"
 INCLUDE = [
@@ -32,11 +33,14 @@ INCLUDE = [
 
 
 def main() -> int:
+    assert_catalog_matches_sources(PROJECT / "catalog")
     DIST.mkdir(parents=True, exist_ok=True)
     target = DIST / f"{PACKAGE_NAME}.zip"
     with tempfile.TemporaryDirectory(prefix="xiaomi-community-store-release-") as temporary:
         root = Path(temporary) / PACKAGE_NAME
         root.mkdir()
+        shutil.copy2(PROJECT.parents[1] / "shared/plugin_security.py", root / "plugin_security.py")
+        shutil.copy2(PROJECT.parents[1] / "shared/offline_dependencies.py", root / "offline_dependencies.py")
         for relative in INCLUDE:
             source = PROJECT / relative
             destination = root / relative

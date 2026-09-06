@@ -10,7 +10,7 @@ from server import StoreServer
 
 class ServerAuthTests(unittest.TestCase):
     def setUp(self) -> None:
-        self.server = StoreServer(("127.0.0.1", 0), False, None, "a" * 32)
+        self.server = StoreServer(("127.0.0.1", 0), False, None, "a" * 32, "u123", "b" * 64)
         self.thread = threading.Thread(target=self.server.serve_forever, daemon=True)
         self.thread.start()
         self.port = self.server.server_address[1]
@@ -50,7 +50,7 @@ class ServerAuthTests(unittest.TestCase):
         status, headers, payload = self.request(
             "GET",
             "/index.html",
-            headers={"X-Xiaomi-Client-Verify": "SUCCESS"},
+            headers={"X-Xiaomi-Client-Verify": "SUCCESS", "X-Xiaomi-Client-DN": "CN=nas.123.test.2", "X-Plugin-Proxy-Key": "b" * 64},
         )
         self.assertEqual(200, status)
         html = payload.decode("utf-8")
@@ -65,18 +65,28 @@ class ServerAuthTests(unittest.TestCase):
         self.server.shutdown()
         self.server.server_close()
         self.thread.join(timeout=2)
-        self.server = StoreServer(("127.0.0.1", 0), False, None, "a" * 32)
+        self.server = StoreServer(("127.0.0.1", 0), False, None, "a" * 32, "u123", "b" * 64)
         self.thread = threading.Thread(target=self.server.serve_forever, daemon=True)
         self.thread.start()
         self.port = self.server.server_address[1]
         status, _, _ = self.request("GET", "/api/catalog", headers={"Cookie": cookie})
         self.assertEqual(200, status)
 
-    def test_xiaomi_relay_gets_session_without_client_cookie(self) -> None:
-        status, _, payload = self.request("GET", "/index.html", headers={"X-Real-IP": "127.1.0.110"})
-        self.assertEqual(200, status)
-        self.assertNotIn(b"__SESSION_TOKEN__", payload)
-        self.assertRegex(payload.decode("utf-8"), r'<meta name="session-token" content="[^\"]+"')
+    def test_loopback_and_spoofed_or_other_owner_certificate_mint_no_session(self) -> None:
+        for headers in (
+            {"X-Real-IP": "127.1.0.110"},
+            {"X-Xiaomi-Client-Verify": "SUCCESS"},
+            {"X-Xiaomi-Client-Verify": "SUCCESS", "X-Xiaomi-Client-DN": "CN=nas.123.test.2"},
+            {"X-Xiaomi-Client-Verify": "SUCCESS", "X-Xiaomi-Client-DN": "CN=nas.999.test.2", "X-Plugin-Proxy-Key": "b" * 64},
+        ):
+            status, result_headers, payload = self.request("GET", "/index.html", headers=headers)
+            self.assertEqual(200, status)
+            self.assertNotIn("Set-Cookie", result_headers)
+            self.assertIn(b'<meta name="session-token" content=""', payload)
+
+    def test_invalid_session_is_not_reflected_into_html(self) -> None:
+        _, _, payload = self.request("GET", "/index.html", headers={"X-Community-Session": '\"><img src=x onerror=alert(1)>'})
+        self.assertNotIn(b"onerror=", payload)
 
 
 if __name__ == "__main__":

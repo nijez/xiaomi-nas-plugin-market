@@ -22,7 +22,11 @@ function Invoke-Native {
 
 function Invoke-NasSsh {
     param([Parameter(Mandatory = $true)][string]$Command)
-    $output = & ssh.exe @script:SshOptions $script:Remote $Command
+    # Only ASCII transport reaches native argv; Windows PowerShell 5.1 strips
+    # nested quotes in plain SSH command strings before the NAS shell sees them.
+    $encoded = [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($Command + "`n"))
+    $wireCommand = "printf %s $encoded | base64 -d | sh"
+    $output = & ssh.exe @script:SshOptions $script:Remote $wireCommand
     if ($LASTEXITCODE -ne 0) {
         throw "NAS command failed with exit code $LASTEXITCODE"
     }
@@ -36,18 +40,18 @@ function Find-XiaomiCertificateUsers {
         (Join-Path $env:APPDATA "Xiaomi"),
         (Join-Path $env:ProgramData "Xiaomi")
     ) | Where-Object { $_ -and (Test-Path $_) }
-    $matches = New-Object System.Collections.Generic.List[string]
+    $certificateUsers = New-Object System.Collections.Generic.List[string]
     foreach ($root in $roots) {
         Get-ChildItem -LiteralPath $root -Filter "*_cert.pem" -File -Recurse -ErrorAction SilentlyContinue | ForEach-Object {
             if ($_.BaseName -match '^(\d+)_.*_cert$') {
                 $candidate = "u$($Matches[1])"
-                if ($RegistryUsers -contains $candidate -and -not $matches.Contains($candidate)) {
-                    $matches.Add($candidate)
+                if ($RegistryUsers -contains $candidate -and -not $certificateUsers.Contains($candidate)) {
+                    $certificateUsers.Add($candidate)
                 }
             }
         }
     }
-    return $matches.ToArray()
+    return $certificateUsers.ToArray()
 }
 
 if (-not (Get-Command ssh.exe -ErrorAction SilentlyContinue) -or -not (Get-Command scp.exe -ErrorAction SilentlyContinue)) {
@@ -82,6 +86,13 @@ if ($PluginId -lt 1) {
 }
 
 $ProjectDir = Split-Path -Parent $MyInvocation.MyCommand.Path
+$SecurityModule = Join-Path $ProjectDir "plugin_security.py"
+if (-not (Test-Path -LiteralPath $SecurityModule)) {
+    $SecurityModule = Join-Path $ProjectDir "..\..\shared\plugin_security.py"
+}
+if (-not (Test-Path -LiteralPath $SecurityModule)) { throw "Missing plugin_security.py" }
+$DependencyModule = Join-Path (Split-Path -Parent $SecurityModule) "offline_dependencies.py"
+if (-not (Test-Path -LiteralPath $DependencyModule)) { throw "Missing offline_dependencies.py" }
 $Remote = "root@$NasIp"
 $SshOptions = @(
     "-i", $NasSshKey,
@@ -98,7 +109,7 @@ Invoke-NasSsh "command -v python3 >/dev/null && command -v openssl >/dev/null &&
 
 if ([string]::IsNullOrWhiteSpace($NasUserId)) {
     $registryOutput = Invoke-NasSsh 'for path in /data/plugin/u*.list; do [ -f "$path" ] || continue; name=${path##*/}; printf "%s\n" "${name%.list}"; done'
-    $registryUsers = @($registryOutput | ForEach-Object { $_.Trim() } | Where-Object { $_ -match '^u[A-Za-z0-9_-]+$' } | Select-Object -Unique)
+    $registryUsers = @($registryOutput | ForEach-Object { $_.Trim() } | Where-Object { $_ -match '^u[0-9]+$' } | Select-Object -Unique)
     if ($registryUsers.Count -eq 1) {
         $NasUserId = $registryUsers[0]
     } else {
@@ -118,7 +129,7 @@ if ([string]::IsNullOrWhiteSpace($NasUserId)) {
         }
     }
 }
-if ($NasUserId -notmatch '^u[A-Za-z0-9_-]+$') {
+if ($NasUserId -notmatch '^u[0-9]+$') {
     throw "小米用户 ID 无效：$NasUserId"
 }
 Write-Host "使用小米用户：$NasUserId"
@@ -133,7 +144,9 @@ $required = @(
     "catalog\repository-public.pem",
     "deploy\xiaomi-community-store.service",
     "deploy\xiaomi-community-store.nginx.conf",
-    "deploy\register_plugin.py"
+    "deploy\register_plugin.py",
+    "deploy\healthcheck.py",
+    "deploy\apply_on_nas.py"
 )
 foreach ($relative in $required) {
     if (-not (Test-Path -LiteralPath (Join-Path $ProjectDir $relative) -PathType Leaf)) {
@@ -141,41 +154,21 @@ foreach ($relative in $required) {
     }
 }
 
-$releaseId = "0.1.2-$(Get-Date -Format yyyyMMddHHmmss)"
+$releaseId = "0.1.3-$(Get-Date -Format yyyyMMddHHmmss)-$([guid]::NewGuid().ToString('N'))"
 $ScpOptions = @($SshOptions)
 $sshVersion = (& cmd.exe /c "ssh.exe -V 2>&1" | Out-String)
 if ($sshVersion -match 'OpenSSH(?:_for_Windows)?_(\d+)' -and [int]$Matches[1] -ge 9) {
     $ScpOptions += "-O"
 }
 $remoteRelease = "/data/plugin/community-store/releases/$releaseId"
-$temporaryService = Join-Path ([System.IO.Path]::GetTempPath()) "xiaomi-community-store-$PID.service"
-try {
-    $urlUserId = $NasUserId.Substring(1)
-    $service = (Get-Content -LiteralPath (Join-Path $ProjectDir "deploy\xiaomi-community-store.service") -Raw).Replace("__NAS_USER_ID__", $NasUserId).Replace("__URL_USER_ID__", $urlUserId)
-    [System.IO.File]::WriteAllText($temporaryService, $service, (New-Object System.Text.UTF8Encoding($false)))
-
-    Invoke-NasSsh "mkdir -p '$remoteRelease' /data/plugin/community-store/state /data/plugin/community-store/staging /data/plugin/community-store/backups /data/plugin/www/icon" | Out-Null
-    foreach ($item in @("server.py", "storelib.py", "web", "catalog")) {
-        $source = Join-Path $ProjectDir $item
-        Invoke-Native -Program "scp.exe" -Arguments ($ScpOptions + @("-r", $source, "${Remote}:$remoteRelease/"))
-    }
-    Invoke-Native -Program "scp.exe" -Arguments ($ScpOptions + @($temporaryService, "${Remote}:/tmp/xiaomi-community-store.service"))
-    Invoke-Native -Program "scp.exe" -Arguments ($ScpOptions + @((Join-Path $ProjectDir "deploy\xiaomi-community-store.nginx.conf"), "${Remote}:/tmp/xiaomi-community-store.conf"))
-    Invoke-Native -Program "scp.exe" -Arguments ($ScpOptions + @((Join-Path $ProjectDir "deploy\register_plugin.py"), "${Remote}:/tmp/register-community-store.py"))
-    Invoke-Native -Program "scp.exe" -Arguments ($ScpOptions + @((Join-Path $ProjectDir "web\assets\community-store-v4.png"), "${Remote}:/data/plugin/www/icon/community-store-v4.icon"))
-
-    $sessionSecret = ((Invoke-NasSsh 'set -eu; token=/data/plugin/community-store/admin-token; if [ ! -s "$token" ]; then umask 077; openssl rand -hex 16 > "$token"; fi; chmod 600 "$token"; cat "$token"') -join "").Trim()
-    if ($sessionSecret -notmatch '^[0-9a-f]{32}$') {
-        throw "NAS 未返回有效会话密钥"
-    }
-    Invoke-NasSsh "openssl dgst -sha256 -verify '$remoteRelease/catalog/repository-public.pem' -signature '$remoteRelease/catalog/catalog.json.sig' '$remoteRelease/catalog/catalog.json' >/dev/null" | Out-Null
-    Invoke-NasSsh "set -eu; service=/etc/systemd/system/xiaomi-community-store.service; conf=/etc/nginx/conf.d/luci/xiaomi-community-store.conf; stamp=`$(date +%s); [ ! -f `"`$service`" ] || cp -p `"`$service`" `"`$service.before-`$stamp.bak`"; [ ! -f `"`$conf`" ] || cp -p `"`$conf`" `"`$conf.before-`$stamp.bak`"; install -m 0644 /tmp/xiaomi-community-store.service `"`$service`"; install -m 0644 /tmp/xiaomi-community-store.conf `"`$conf`"; ln -sfn '$remoteRelease' /data/plugin/community-store/current; nginx -t; systemctl daemon-reload; systemctl enable xiaomi-community-store.service; systemctl restart xiaomi-community-store.service; systemctl reload nginx" | Out-Null
-    Invoke-NasSsh "python3 /tmp/register-community-store.py --user-id '$NasUserId' --plugin-id '$PluginId'" | Out-Null
-    Invoke-NasSsh "systemctl is-active --quiet xiaomi-community-store.service && python3 -c `"import urllib.request; urllib.request.urlopen('http://127.0.0.1:18119/healthz', timeout=8)`"" | Out-Null
-
-    Write-Host ""
-    Write-Host "插件市场已安装。请完全退出并重新打开小米智能存储客户端。"
-    Write-Host "插件市场会使用小米客户端入口自动授权，不需要管理码。"
-} finally {
-    Remove-Item -LiteralPath $temporaryService -Force -ErrorAction SilentlyContinue
+Invoke-NasSsh "mkdir -p '$remoteRelease'" | Out-Null
+foreach ($item in @("server.py", "storelib.py", "web", "catalog", "deploy")) {
+    $source = Join-Path $ProjectDir $item
+    Invoke-Native -Program "scp.exe" -Arguments ($ScpOptions + @("-r", $source, "${Remote}:$remoteRelease/"))
 }
+Invoke-Native -Program "scp.exe" -Arguments ($ScpOptions + @($SecurityModule, "${Remote}:$remoteRelease/plugin_security.py"))
+Invoke-Native -Program "scp.exe" -Arguments ($ScpOptions + @($DependencyModule, "${Remote}:$remoteRelease/offline_dependencies.py"))
+Invoke-NasSsh "python3 '$remoteRelease/deploy/apply_on_nas.py' --user-id '$NasUserId' --plugin-id '$PluginId'" | Out-Null
+Write-Host ""
+Write-Host "插件市场已安装。请完全退出并重新打开小米智能存储客户端。"
+Write-Host "插件市场要求设备所有者的已验证客户端入口，不需要管理码。"

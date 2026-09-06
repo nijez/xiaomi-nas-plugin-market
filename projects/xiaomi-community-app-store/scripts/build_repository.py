@@ -9,6 +9,7 @@ import json
 import os
 import shutil
 import subprocess
+import sys
 import tempfile
 import time
 import zipfile
@@ -19,6 +20,8 @@ from typing import Any
 PROJECT = Path(__file__).resolve().parents[1]
 WORK = PROJECT.parent
 CATALOG = PROJECT / "catalog"
+sys.path.insert(0, str(PROJECT.parents[1] / "shared"))
+from offline_dependencies import DependencyError, verify_bundle
 
 
 PACKAGE_SPECS: list[dict[str, Any]] = [
@@ -140,7 +143,7 @@ PACKAGE_SPECS: list[dict[str, Any]] = [
         "service": "xiaomi-115-sync.service",
         "nginxSource": "deploy/xiaomi-115-sync.nginx.conf",
         "nginx": "xiaomi-115-sync.conf",
-        "healthPath": "/api/status",
+        "healthPath": "/healthz",
         "registry": {
             "icon": "/icon/115-sync.icon?v=115life-38.2.0",
             "frontend": {
@@ -176,7 +179,7 @@ PACKAGE_SPECS: list[dict[str, Any]] = [
         "service": "xiaomi-aliyundrive-sync.service",
         "nginxSource": "deploy/xiaomi-aliyundrive-sync.nginx.conf",
         "nginx": "xiaomi-aliyundrive-sync.conf",
-        "healthPath": "/api/status",
+        "healthPath": "/healthz",
         "registry": {
             "icon": "/icon/aliyundrive-sync.icon?v=0.1.0",
             "frontend": {
@@ -220,7 +223,7 @@ def copy_required(source: Path, target: Path) -> None:
         raise SystemExit(f"Missing package source: {source}")
     target.parent.mkdir(parents=True, exist_ok=True)
     if source.is_dir():
-        shutil.copytree(source, target, dirs_exist_ok=True)
+        shutil.copytree(source, target, dirs_exist_ok=True, ignore=shutil.ignore_patterns("__pycache__", "*.pyc", ".DS_Store"))
     else:
         shutil.copy2(source, target)
 
@@ -240,16 +243,60 @@ def sign(payload: Path, private_key: Path, signature: Path) -> None:
     run(["openssl", "dgst", "-sha256", "-sign", str(private_key), "-out", str(signature), str(payload)])
 
 
+def check_dependencies(spec: dict[str, Any]) -> None:
+    if spec.get("requirements"):
+        try:
+            verify_bundle(Path(spec["project"]) / "requirements.txt")
+        except DependencyError as error:
+            raise SystemExit(f"Dependency release gate ({spec['id']}): {error}") from error
+
+
+def populate_payload(spec: dict[str, Any], root: Path) -> None:
+    project = Path(spec["project"])
+    check_dependencies(spec)
+    for source, destination in spec["runtime"].items():
+        copy_required(project / source, root / "runtime" / destination)
+    if spec.get("requirements"):
+        for name in ("requirements.lock", "wheelhouse"):
+            copy_required(project / name, root / "runtime" / name)
+        copy_required(PROJECT.parents[1] / "shared/offline_dependencies.py", root / "runtime/offline_dependencies.py")
+    if spec["id"] in {"115sync", "aliyundrivesync", "webdav", "qbittorrent"}:
+        copy_required(PROJECT.parents[1] / "shared/plugin_security.py", root / "runtime/plugin_security.py")
+    copy_required(project / spec["ui"], root / "ui")
+    copy_required(project / spec["iconSource"], root / "icon")
+    copy_required(project / spec["serviceSource"], root / "config" / spec["service"])
+    copy_required(project / spec["nginxSource"], root / "config" / spec["nginx"])
+
+
+def assert_catalog_matches_sources(catalog_dir: Path) -> None:
+    """Do not ship an installer claiming source fixes with old signed payloads."""
+    catalog = json.loads((catalog_dir / "catalog.json").read_text(encoding="utf-8"))
+    specs = {spec["id"]: spec for spec in PACKAGE_SPECS}
+    for package in catalog["packages"]:
+        spec = specs.get(package["id"])
+        if spec is None or package["version"] != spec["version"]:
+            raise SystemExit(f"Catalog identity does not match current source: {package['id']}")
+        bundle = (catalog_dir / package["bundle"]).resolve()
+        if catalog_dir.resolve() not in bundle.parents:
+            raise SystemExit("Bundle path escapes the catalog")
+        with tempfile.TemporaryDirectory(prefix="nas-source-gate-") as temporary:
+            root = Path(temporary)
+            populate_payload(spec, root)
+            expected = {path.relative_to(root).as_posix(): hashlib.sha256(path.read_bytes()).hexdigest()
+                        for path in root.rglob("*") if path.is_file()}
+            with zipfile.ZipFile(bundle) as archive:
+                actual = {info.filename: hashlib.sha256(archive.read(info)).hexdigest()
+                          for info in archive.infolist() if not info.is_dir() and info.filename != "manifest.json"}
+                manifest = json.loads(archive.read("manifest.json"))
+            if expected != actual or manifest.get("healthPath") != spec["healthPath"]:
+                raise SystemExit(f"Stale signed bundle: {package['id']}. Rebuild and sign plugin payloads; installer-only refresh is blocked.")
+
+
 def build_bundle(spec: dict[str, Any], private_key: Path) -> dict[str, Any]:
     project = Path(spec["project"])
     with tempfile.TemporaryDirectory(prefix=f"xiaomi-store-{spec['id']}-") as temporary:
         root = Path(temporary)
-        for source, destination in spec["runtime"].items():
-            copy_required(project / source, root / "runtime" / destination)
-        copy_required(project / spec["ui"], root / "ui")
-        copy_required(project / spec["iconSource"], root / "icon")
-        copy_required(project / spec["serviceSource"], root / "config" / spec["service"])
-        copy_required(project / spec["nginxSource"], root / "config" / spec["nginx"])
+        populate_payload(spec, root)
         manifest = {
             "schemaVersion": 1,
             "id": spec["id"],
@@ -307,6 +354,8 @@ def main() -> int:
         raise SystemExit('Candidate publication requires a separate --output directory')
     if any('-rc' in spec['version'] for spec in PACKAGE_SPECS) and not args.include_candidates:
         raise SystemExit('Candidate package present: use the plugin candidate builder; stable catalog was not updated')
+    for spec in PACKAGE_SPECS:
+        check_dependencies(spec)
     ensure_key(args.signing_key.expanduser(), args.create_key)
     (CATALOG / "bundles").mkdir(parents=True, exist_ok=True)
     (CATALOG / "icons").mkdir(parents=True, exist_ok=True)

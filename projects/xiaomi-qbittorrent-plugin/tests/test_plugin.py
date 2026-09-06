@@ -225,7 +225,8 @@ class HTTPTests(unittest.TestCase):
 
     def test_owner_cert_gets_session(self):
         self.server.dev = False
-        _, body = self.request('GET', '/', headers={'X-Xiaomi-Client-Verify':'SUCCESS','X-Xiaomi-Client-DN':'CN=nas.123456.test.2'})
+        self.server.proxy_key = 'b' * 64
+        _, body = self.request('GET', '/', headers={'X-Xiaomi-Client-Verify':'SUCCESS','X-Xiaomi-Client-DN':'CN=nas.123456.test.2','X-Plugin-Proxy-Key':'b' * 64})
         self.assertNotIn(b'name="qb-session" content=""', body)
 
 

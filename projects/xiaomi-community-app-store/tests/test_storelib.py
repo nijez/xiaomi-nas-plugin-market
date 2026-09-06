@@ -5,6 +5,7 @@ import subprocess
 import tempfile
 import unittest
 import zipfile
+from unittest.mock import patch
 from pathlib import Path
 
 from storelib import (
@@ -14,6 +15,7 @@ from storelib import (
     safe_extract_bundle,
     validate_manifest,
     verify_detached_signature,
+    installation_lock,
 )
 
 
@@ -23,6 +25,31 @@ PUBLIC_KEY = CATALOG / "repository-public.pem"
 
 
 class StoreLibraryTests(unittest.TestCase):
+    def test_old_online_requirements_bundle_cannot_activate(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            registry = root / "data/plugin/u_test.list"
+            registry.parent.mkdir(parents=True)
+            registry.write_text("{}\n")
+            manager = InstallManager(CATALOG, PUBLIC_KEY, "u_test", root=root, execute_system=True)
+            with patch.object(manager, "_service_state", return_value=(False, "disabled")), \
+                 patch.object(manager, "_run") as run:
+                with self.assertRaisesRegex(StoreError, "requirements.lock"):
+                    manager.install("115sync")
+                run.assert_not_called()
+            self.assertEqual(registry.read_text(), "{}\n")
+            self.assertFalse((root / "data/plugin/115-sync/current").exists())
+
+    def test_two_installers_cannot_enter_the_transaction_together(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            lock = Path(temporary) / "install.lock"
+            with installation_lock(lock):
+                with self.assertRaisesRegex(StoreError, "in progress"):
+                    with installation_lock(lock):
+                        self.fail("Competing installation entered")
+            with installation_lock(lock):
+                pass
+
     def test_catalog_and_all_bundles_verify(self) -> None:
         catalog = load_verified_catalog(CATALOG, PUBLIC_KEY)
         self.assertEqual({'devicemanager', '115sync', 'aliyundrivesync', 'webdav', 'qbittorrent'}, {p['id'] for p in catalog['packages']})
@@ -104,6 +131,63 @@ class StoreLibraryTests(unittest.TestCase):
                 {"version": "0.4.1", "managed": False},
                 manager.inventory()["devicemanager"],
             )
+
+    def test_failed_install_restores_files_and_service_prestate(self) -> None:
+        for previous in (None, (False, "disabled"), (True, "enabled"), (True, "enabled-runtime")):
+            with self.subTest(previous=previous), tempfile.TemporaryDirectory() as temporary:
+                root = Path(temporary)
+                registry = root / "data/plugin/u_test.list"
+                registry.parent.mkdir(parents=True)
+                registry.write_text("{}\n")
+                manager = InstallManager(CATALOG, PUBLIC_KEY, "u_test", root=root, execute_system=False)
+                if previous is not None:
+                    manager.install("aliyundrivesync")
+                current = root / "data/plugin/aliyundrive-sync/current"
+                old_target = current.readlink() if current.is_symlink() else None
+                state_file = manager.state_dir / "aliyundrivesync.json"
+                old_state = state_file.read_bytes() if state_file.exists() else None
+                old_registry = registry.read_bytes()
+                commands = []
+                service = "xiaomi-aliyundrive-sync.service"
+                def run(command):
+                    commands.append(command)
+                    if command == ["systemctl", "stop", service]:
+                        self.assertTrue(current.exists(), "candidate was deleted while still running")
+                manager.execute_system = True
+                with patch.object(manager, "_service_state", return_value=previous or (False, "disabled")), \
+                     patch.object(manager, "_run", side_effect=run), \
+                     patch.object(manager, "_wait_for_health", side_effect=StoreError("fixture unhealthy")):
+                    with self.assertRaisesRegex(StoreError, "fixture unhealthy"):
+                        manager.install("aliyundrivesync")
+                self.assertIn(["systemctl", "stop", service], commands)
+                self.assertIn(["systemctl", "disable", service], commands)
+                self.assertEqual(old_registry, registry.read_bytes())
+                self.assertEqual(old_target, current.readlink() if current.is_symlink() else None)
+                self.assertEqual(old_state, state_file.read_bytes() if state_file.exists() else None)
+                starts = [command for command in commands if command[:2] == ["systemctl", "start"]]
+                self.assertEqual(bool(previous and previous[0]), bool(starts))
+                enables = [command for command in commands if command[:2] == ["systemctl", "enable"]]
+                self.assertEqual(2 if previous and previous[1].startswith("enabled") else 1, len(enables))
+                if previous and previous[1] == "enabled-runtime":
+                    self.assertEqual(["systemctl", "enable", "--runtime", service], enables[-1])
+
+    def test_cannot_stop_candidate_preserves_recovery_files(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            registry = root / "data/plugin/u_test.list"
+            registry.parent.mkdir(parents=True)
+            registry.write_text("{}\n")
+            manager = InstallManager(CATALOG, PUBLIC_KEY, "u_test", root=root, execute_system=True)
+            def run(command):
+                if command[:2] == ["systemctl", "stop"]:
+                    raise StoreError("fixture stop failed")
+            with patch.object(manager, "_service_state", return_value=(False, "disabled")), \
+                 patch.object(manager, "_run", side_effect=run), \
+                 patch.object(manager, "_wait_for_health", side_effect=StoreError("fixture unhealthy")):
+                with self.assertRaisesRegex(StoreError, "rollback incomplete"):
+                    manager.install("aliyundrivesync")
+            self.assertTrue((root / "data/plugin/aliyundrive-sync/current").exists())
+            self.assertEqual("{}\n", registry.read_text())
 
 
 if __name__ == "__main__":

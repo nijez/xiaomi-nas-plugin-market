@@ -3,6 +3,7 @@ import importlib.util
 import os
 import tempfile
 import unittest
+from unittest.mock import Mock, patch
 from pathlib import Path, PurePosixPath
 
 
@@ -69,6 +70,82 @@ class OAuthAndTransferTests(unittest.TestCase):
 
     def test_pre_hash_match_is_not_reported_as_a_generic_error(self):
         self.assertEqual(server.AliyunApi._data({"code": "PreHashMatched"}), {"code": "PreHashMatched"})
+
+
+class DownloadIntegrityTests(unittest.TestCase):
+    def setUp(self):
+        self.directory = tempfile.TemporaryDirectory(dir=TEST_ROOT)
+        self.addCleanup(self.directory.cleanup)
+        self.root = Path(self.directory.name)
+        self.service = object.__new__(server.SyncService)
+        self.service.api = Mock()
+        self.service._access = Mock(return_value=("fixture-token", "fixture-drive"))
+        self.service._set_progress = Mock()
+        self.service._save_manifest = Mock()
+        self.job = {"id": "test", "localPath": str(self.root), "remoteFolderId": "root"}
+        self.item = {"file_id": "file1", "size": 4, "updated_at": "unchanged"}
+        self.service._remote_files = Mock(return_value=[(PurePosixPath("a.txt"), self.item)])
+
+    def run_download(self, payload=b"NEW!"):
+        with patch.object(server.HttpClient, "download", side_effect=lambda url, target: target.write_bytes(payload)) as download:
+            result = self.service._sync_download(self.job, {})
+        return result, download.call_count
+
+    def test_same_size_different_content_is_preserved_as_conflict(self):
+        (self.root / "a.txt").write_bytes(b"OLD!")
+        self.job["manifest"] = {"a.txt": {"stamp": "file1:4:unchanged", "fileId": "file1"}}
+        result, _ = self.run_download()
+        self.assertEqual(result["copied"], 1)
+        self.assertEqual((self.root / "a.txt").read_bytes(), b"OLD!")
+        self.assertEqual(sorted(p.read_bytes() for p in self.root.iterdir()), [b"NEW!", b"OLD!"])
+
+    def test_conflict_retry_without_manifest_does_not_duplicate(self):
+        (self.root / "a.txt").write_bytes(b"OLD!")
+        self.run_download()
+        result, _ = self.run_download()
+        self.assertEqual(result["skipped"], 1)
+        self.assertEqual(len(list(self.root.iterdir())), 2)
+
+    def test_equal_content_without_remote_hash_is_compared_after_download(self):
+        (self.root / "a.txt").write_bytes(b"NEW!")
+        result, calls = self.run_download()
+        self.assertEqual(calls, 1)
+        self.assertEqual(result["skipped"], 1)
+
+    def test_matching_remote_hash_avoids_download(self):
+        (self.root / "a.txt").write_bytes(b"NEW!")
+        self.item.update(content_hash_name="sha1", content_hash=hashlib.sha1(b"NEW!").hexdigest())
+        result, calls = self.run_download()
+        self.assertEqual((calls, result["skipped"]), (0, 1))
+
+    def test_wrong_hash_or_short_response_is_not_published(self):
+        self.item.update(content_hash_name="sha1", content_hash=hashlib.sha1(b"NEW!").hexdigest())
+        for payload in (b"bad", b"BAD!"):
+            with self.assertRaises(server.ServiceError):
+                self.run_download(payload)
+            self.assertEqual(list(self.root.iterdir()), [])
+            self.service._save_manifest.assert_not_called()
+
+    def test_failed_download_leaves_no_final_file_or_manifest(self):
+        with patch.object(server.HttpClient, "download", side_effect=OSError("fixture disconnected")):
+            with self.assertRaises(OSError):
+                self.service._sync_download(self.job, {})
+        self.assertEqual(list(self.root.iterdir()), [])
+        self.service._save_manifest.assert_not_called()
+
+    def test_concurrent_final_file_creation_does_not_get_overwritten(self):
+        original_link = os.link
+        first = True
+        def racing_link(source, target):
+            nonlocal first
+            if first:
+                first = False
+                target.write_bytes(b"RACE")
+            return original_link(source, target)
+        with patch.object(server.os, "link", side_effect=racing_link):
+            self.run_download()
+        self.assertEqual((self.root / "a.txt").read_bytes(), b"RACE")
+        self.assertEqual(sorted(p.read_bytes() for p in self.root.iterdir()), [b"NEW!", b"RACE"])
 
 
 class RegistryTests(unittest.TestCase):

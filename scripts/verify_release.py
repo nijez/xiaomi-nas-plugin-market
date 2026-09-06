@@ -5,6 +5,7 @@ import io
 import json
 import re
 import sys
+import subprocess
 import tempfile
 import zipfile
 from pathlib import Path, PurePosixPath
@@ -63,10 +64,40 @@ def inspect(name, body, depth=0):
             findings.append((name, kind))
 
 
+def inspect_staged(root=ROOT):
+    """Scan index blobs, not unstaged replacements or unrelated local files."""
+    names = subprocess.check_output([
+        'git', 'diff', '--cached', '--name-only', '--diff-filter=ACMR', '-z',
+    ], cwd=root).split(b'\0')
+    count = 0
+    for raw in names:
+        if not raw:
+            continue
+        name = raw.decode('utf-8')
+        entry = subprocess.check_output(['git', 'ls-files', '--stage', '-z', '--', name], cwd=root)
+        if not entry.startswith(b'100644 ') and not entry.startswith(b'100755 '):
+            findings.append((name, 'non-regular staged file'))
+            continue
+        body = subprocess.check_output(['git', 'show', ':' + name], cwd=root)
+        inspect(name, body)
+        count += 1
+    return count
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--artifacts', type=Path, default=ROOT / 'artifacts')
+    parser.add_argument('--staged', action='store_true', help='Read-only privacy check of staged Git blobs; not release verification')
     args = parser.parse_args()
+    findings.clear()
+    if args.staged:
+        count = inspect_staged()
+        if findings:
+            for name, kind in sorted(set(findings)):
+                print(f'BLOCKED: {name}: {kind}')
+            raise SystemExit('Commit blocked; no matching secret values were printed')
+        print(json.dumps({'ok': True, 'stagedFilesScanned': count, 'releaseVerified': False}))
+        return
     files = 0
     for file in ROOT.rglob('*'):
         relative = file.relative_to(ROOT)

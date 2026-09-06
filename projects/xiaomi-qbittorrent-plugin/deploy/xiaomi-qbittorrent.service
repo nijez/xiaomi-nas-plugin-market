@@ -10,6 +10,7 @@ Environment=NAS_USER_ID=__NAS_USER_ID__
 Environment=DATA_DIR=/data/plugin/qbittorrent/data
 Environment=LOCAL_ROOT=/nas/pool0/__NAS_USER_ID__/data
 Environment=PORT=18122
+Environment=PATH=/data/docker:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 ExecStart=/usr/bin/python3 /data/plugin/qbittorrent/current/server.py
 ExecStopPost=/usr/bin/python3 /data/plugin/qbittorrent/current/server.py --stop-owned
 Restart=on-failure

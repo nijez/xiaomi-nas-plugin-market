@@ -4,6 +4,8 @@
 from __future__ import annotations
 
 import hashlib
+import fcntl
+from contextlib import contextmanager
 import json
 import os
 import re
@@ -13,9 +15,16 @@ import subprocess
 import tempfile
 import time
 import urllib.request
+import uuid
 import zipfile
 from pathlib import Path, PurePosixPath
 from typing import Any
+import sys
+
+if (Path(__file__).resolve().parents[2] / "shared").is_dir():
+    sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "shared"))
+from plugin_security import provision_proxy
+from offline_dependencies import DependencyError, install_bundle, verify_bundle
 
 
 ID_PATTERN = re.compile(r"^[a-z0-9][a-z0-9-]{2,39}$")
@@ -29,6 +38,20 @@ MAX_FILES = 5000
 
 class StoreError(RuntimeError):
     pass
+
+
+@contextmanager
+def installation_lock(path: Path):
+    path.parent.mkdir(parents=True, exist_ok=True)
+    descriptor = os.open(path, os.O_CREAT | os.O_RDWR | os.O_NOFOLLOW, 0o600)
+    try:
+        try:
+            fcntl.flock(descriptor, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except BlockingIOError as error:
+            raise StoreError("Another NAS installation or removal is in progress") from error
+        yield
+    finally:
+        os.close(descriptor)
 
 
 def sha256_file(path: Path) -> str:
@@ -283,55 +306,38 @@ class InstallManager:
             detail = (result.stderr or result.stdout or "command failed").strip()
             raise StoreError(f"{command[0]} failed: {detail}")
 
+    def _service_state(self, service: str) -> tuple[bool, str]:
+        if not self.execute_system:
+            return False, "disabled"
+        active = subprocess.run(["systemctl", "is-active", service], capture_output=True, text=True, check=False)
+        enabled = subprocess.run(["systemctl", "is-enabled", service], capture_output=True, text=True, check=False)
+        active_state = active.stdout.strip()
+        enabled_state = enabled.stdout.strip()
+        if not enabled_state and enabled.returncode != 0:
+            loaded = subprocess.run(["systemctl", "show", service, "--property=LoadState", "--value"], capture_output=True, text=True, check=False)
+            if loaded.stdout.strip() == "not-found":
+                enabled_state = "not-found"
+        if active_state not in {"active", "inactive", "failed", "unknown"}:
+            raise StoreError(f"Cannot safely snapshot service state: {active_state or active.stderr.strip()}")
+        if enabled_state == "not-found" or (not enabled_state and enabled.returncode == 4):
+            enabled_state = "disabled"
+        if enabled_state not in {"enabled", "enabled-runtime", "disabled", "static", "indirect"}:
+            raise StoreError(f"Refusing to change unsupported service enablement: {enabled_state or enabled.stderr.strip()}")
+        return active_state == "active", enabled_state
+
     def _install_requirements(self, extracted: Path, manifest: dict[str, Any], release: Path) -> None:
         requirements = manifest.get("requirements")
         if not requirements:
             return
         requirements_path = extracted / requirements
-        if not requirements_path.is_file():
-            raise StoreError("Declared requirements file is missing")
-        if not self.execute_system:
-            return
-        pip_check = subprocess.run(
-            ["/usr/bin/python3", "-m", "pip", "--version"],
-            capture_output=True,
-            text=True,
-            check=False,
-        )
-        if pip_check.returncode != 0:
-            self._run(["/usr/bin/python3", "-m", "ensurepip", "--upgrade"])
-        indexes = [
-            "https://pypi.org/simple",
-            "https://pypi.tuna.tsinghua.edu.cn/simple",
-            "https://mirrors.aliyun.com/pypi/simple",
-        ]
-        fastest = indexes[0]
-        best = float("inf")
-        for index in indexes:
-            started = time.monotonic()
-            try:
-                with urllib.request.urlopen(index, timeout=4) as response:
-                    if response.status < 400 and time.monotonic() - started < best:
-                        best = time.monotonic() - started
-                        fastest = index
-            except Exception:
-                continue
-        self._run(
-            [
-                "/usr/bin/python3",
-                "-m",
-                "pip",
-                "install",
-                "--disable-pip-version-check",
-                "--no-warn-script-location",
-                "--index-url",
-                fastest,
-                "--target",
-                str(release / "lib"),
-                "-r",
-                str(requirements_path),
-            ]
-        )
+        if extracted.resolve() not in requirements_path.resolve().parents:
+            raise StoreError("Requirements path escapes the bundle")
+        try:
+            verify_bundle(requirements_path)
+            if self.execute_system:
+                install_bundle(requirements_path, release / "lib", python="/usr/bin/python3")
+        except DependencyError as error:
+            raise StoreError(str(error)) from error
 
     def _wait_for_health(self, url: str, timeout: float = 20) -> None:
         deadline = time.monotonic() + timeout
@@ -348,6 +354,10 @@ class InstallManager:
         raise StoreError(f"Health check failed after {timeout:g}s: {last_error}")
 
     def install(self, package_id: str) -> dict[str, Any]:
+        with installation_lock(self._host("/data/plugin/community-store/install.lock")):
+            return self._install_locked(package_id)
+
+    def _install_locked(self, package_id: str) -> dict[str, Any]:
         package = self._package_entry(package_id)
         bundle = self._catalog_file(package["bundle"])
         signature = self._catalog_file(package["signature"])
@@ -355,7 +365,7 @@ class InstallManager:
             raise StoreError("Bundle checksum mismatch")
         verify_detached_signature(bundle, signature, self.public_key)
 
-        operation = f"{int(time.time())}-{os.getpid()}"
+        operation = f"{int(time.time())}-{uuid.uuid4().hex}"
         staging_root = self._host(f"/data/plugin/community-store/staging/{operation}")
         backup_root = self._host(f"/data/plugin/community-store/backups/{operation}")
         staging_root.mkdir(parents=True, exist_ok=False)
@@ -391,6 +401,7 @@ class InstallManager:
                 "nginx": nginx_target,
                 "registry": registry_path,
                 "current": release_root / "current",
+                "state": self.state_dir / f"{manifest['id']}.json",
             }
             existing: dict[str, bool] = {}
             for key, target in tracked.items():
@@ -398,6 +409,8 @@ class InstallManager:
                 if existing[key]:
                     _copy_path(target, backup_root / key)
 
+            was_active, was_enabled = self._service_state(manifest["service"])
+            activation_started = False
             try:
                 _copy_path(staging_root / "runtime", release)
                 self._install_requirements(staging_root, manifest, release)
@@ -413,6 +426,8 @@ class InstallManager:
                 nginx_target.write_text(nginx_text, encoding="utf-8")
                 os.chmod(service_target, 0o644)
                 os.chmod(nginx_target, 0o644)
+                if "__PLUGIN_PROXY_KEY__" in nginx_text:
+                    provision_proxy(nginx_target, nginx_target, release_root / "proxy.key")
                 current = release_root / "current"
                 current.parent.mkdir(parents=True, exist_ok=True)
                 temporary_link = current.with_name("current.community-store.tmp")
@@ -424,6 +439,7 @@ class InstallManager:
                 temporary_link.replace(current)
 
                 self._run(["nginx", "-t"])
+                activation_started = True
                 self._run(["systemctl", "daemon-reload"])
                 self._run(["systemctl", "enable", manifest["service"]])
                 self._run(["systemctl", "restart", manifest["service"]])
@@ -441,7 +457,15 @@ class InstallManager:
                     "release": str(release),
                 }
                 _write_json_atomic(self.state_dir / f"{manifest['id']}.json", state, 0o600)
-            except Exception:
+            except Exception as install_error:
+                # Stop and disable the candidate BEFORE removing its unit or code.
+                # A failed stop is not permission to destroy a running release.
+                if activation_started:
+                    try:
+                        self._run(["systemctl", "stop", manifest["service"]])
+                        self._run(["systemctl", "disable", manifest["service"]])
+                    except Exception as rollback_error:
+                        raise StoreError(f"Install failed: {install_error}; rollback incomplete: {rollback_error}; preserved {backup_root} and {release}") from install_error
                 for key, target in tracked.items():
                     if target.exists() or target.is_symlink():
                         if target.is_dir() and not target.is_symlink():
@@ -452,17 +476,30 @@ class InstallManager:
                         _copy_path(backup_root / key, target)
                 if release.exists():
                     shutil.rmtree(release)
-                if self.execute_system:
-                    subprocess.run(["systemctl", "daemon-reload"], check=False)
-                    subprocess.run(["nginx", "-t"], check=False)
-                    subprocess.run(["systemctl", "restart", manifest["service"]], check=False)
-                    subprocess.run(["systemctl", "reload", "nginx"], check=False)
+                if activation_started:
+                    try:
+                        self._run(["systemctl", "daemon-reload"])
+                        if was_enabled in {"enabled", "enabled-runtime"}:
+                            command = ["systemctl", "enable"]
+                            if was_enabled == "enabled-runtime":
+                                command.append("--runtime")
+                            self._run(command + [manifest["service"]])
+                        if was_active:
+                            self._run(["systemctl", "start", manifest["service"]])
+                        self._run(["nginx", "-t"])
+                        self._run(["systemctl", "reload", "nginx"])
+                    except Exception as rollback_error:
+                        raise StoreError(f"Install failed: {install_error}; rollback incomplete: {rollback_error}; backups at {backup_root}") from install_error
                 raise
             return {"ok": True, "id": manifest["id"], "version": manifest["version"]}
         finally:
             shutil.rmtree(staging_root, ignore_errors=True)
 
     def uninstall(self, package_id: str) -> dict[str, Any]:
+        with installation_lock(self._host("/data/plugin/community-store/install.lock")):
+            return self._uninstall_locked(package_id)
+
+    def _uninstall_locked(self, package_id: str) -> dict[str, Any]:
         state_path = self.state_dir / f"{package_id}.json"
         if not state_path.is_file():
             raise StoreError("Only plugins installed by this store can be uninstalled here")

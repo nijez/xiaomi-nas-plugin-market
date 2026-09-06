@@ -5,7 +5,6 @@ import argparse
 import base64
 import hashlib
 import hmac
-import ipaddress
 import json
 import mimetypes
 import os
@@ -14,12 +13,17 @@ import secrets
 import tempfile
 import threading
 import time
+import sys
 from http.cookies import SimpleCookie, CookieError
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import urlsplit, parse_qs
 
 from engine import Engine, Error, VERSION, qb_request, mutation, torrent_hash
+
+if (Path(__file__).resolve().parents[2] / 'shared').is_dir():
+    sys.path.insert(0, str(Path(__file__).resolve().parents[2] / 'shared'))
+from plugin_security import load_proxy_key, trusted_owner, session_key_v2
 
 WEB = Path(__file__).resolve().parent / 'web'
 TTL = 86400
@@ -28,14 +32,15 @@ TTL = 86400
 class Server(ThreadingHTTPServer):
     daemon_threads = True
 
-    def __init__(self, addr, engine, user, dev=False):
+    def __init__(self, addr, engine, user, dev=False, proxy_key=''):
         self.engine, self.user, self.dev = engine, user, dev
         keyfile = engine.data / 'session.key'
         if not keyfile.exists():
             with keyfile.open('xb') as stream:
                 os.chmod(keyfile, 0o600)
                 stream.write(secrets.token_bytes(32))
-        self.key = keyfile.read_bytes()
+        self.key = session_key_v2(keyfile.read_bytes(), 'qbittorrent', user)
+        self.proxy_key = proxy_key
         self.logins = {}
         self.login_lock = threading.Lock()
         self.request_slots = threading.BoundedSemaphore(12)
@@ -82,13 +87,7 @@ class Handler(BaseHTTPRequestHandler):
     def trusted(self):
         if self.server.dev:
             return True
-        dn = self.headers.get('X-Xiaomi-Client-DN', '')
-        if self.headers.get('X-Xiaomi-Client-Verify') == 'SUCCESS' and re.search(r'CN=nas\.' + re.escape(self.server.user.lstrip('u')) + r'\.', dn):
-            return True
-        try:
-            return ipaddress.ip_address(self.headers.get('X-Real-IP', '')).is_loopback
-        except ValueError:
-            return False
+        return trusted_owner(self.headers, self.server.user, self.server.proxy_key)
 
     def require(self, write=False):
         token = self.session()
@@ -246,7 +245,8 @@ def main():
     if args.stop_owned:
         engine.stop(remember=False)
         return
-    server = Server(('127.0.0.1', int(os.environ.get('PORT', 18122))), engine, user, args.dev)
+    server = Server(('127.0.0.1', int(os.environ.get('PORT', 18122))), engine, user, args.dev,
+                    load_proxy_key(engine.data.parent / 'proxy.key'))
     if engine.config and engine.config.get('enabled') and not args.dev:
         engine.launch('start', {})
     print('qB plugin listening on http://127.0.0.1:' + str(server.server_port), flush=True)

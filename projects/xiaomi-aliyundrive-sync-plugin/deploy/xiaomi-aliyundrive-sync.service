@@ -8,6 +8,7 @@ Type=simple
 WorkingDirectory=/data/plugin/aliyundrive-sync/current
 Environment=HOST=127.0.0.1
 Environment=PORT=18117
+Environment=NAS_USER_ID=__NAS_USER_ID__
 Environment=DATA_DIR=/data/plugin/aliyundrive-sync/data
 Environment=LOCAL_ROOT=/nas/pool0
 ExecStart=/usr/bin/python3 /data/plugin/aliyundrive-sync/current/server.py

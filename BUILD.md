@@ -16,6 +16,8 @@ Git 不保存 75 MiB 的可执行文件，Release 的 WebDAV 安装包包含它�
 
 需要 Python 3.9+、Node.js、OpenSSL。部署目标当前为 RP05/Linux ARM64。
 
+本地加固候选要求 115 携带受审离线 wheelhouse 和哈希锁；当前尚未齐备，构建会拒绝继续。先完成 [离线依赖准备](docs/OFFLINE-DEPENDENCIES.md)，不能通过恢复在线 root pip 绕过检查。
+
 发布私钥必须保存在仓库之外，首次创建自己的 P-256 签名密钥：
 
 ```bash

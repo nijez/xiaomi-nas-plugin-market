@@ -16,6 +16,8 @@ import os
 import re
 import secrets
 import shutil
+import sys
+import tempfile
 import threading
 import time
 import uuid
@@ -28,6 +30,10 @@ from typing import Any, Callable
 from urllib.error import HTTPError, URLError
 from urllib.parse import parse_qs
 from urllib.request import Request, urlopen
+
+if (Path(__file__).resolve().parents[2] / "shared").is_dir():
+    sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "shared"))
+from plugin_security import load_proxy_key, trusted_owner, authorized_write
 
 
 HOST = os.environ.get("HOST", "127.0.0.1")
@@ -289,6 +295,33 @@ class HttpClient:
             except OSError:
                 pass
             raise ServiceError(502, f"文件下载失败：{safe_message(error, '网络错误')}") from error
+
+
+def sha256_for_file(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as source:
+        for chunk in iter(lambda: source.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def publish_download(temporary: Path, destination: Path, digest: str) -> tuple[Path, bool]:
+    # Link rather than replace: another writer winning the race must not lose data.
+    # Content-derived conflict names make retries idempotent even without a manifest.
+    for attempt in range(100):
+        if attempt == 0:
+            target = destination
+        else:
+            suffix = "" if attempt == 1 else f"-{attempt}"
+            target = destination.with_name(f"{destination.stem}.aliyun-{digest[:16]}{suffix}{destination.suffix}")
+        try:
+            os.link(temporary, target)
+            return target, True
+        except FileExistsError:
+            if not target.is_symlink() and target.is_file() and target.stat().st_size == temporary.stat().st_size:
+                if sha256_for_file(target) == digest:
+                    return target, False
+    raise ServiceError(409, "备份文件冲突过多，未覆盖任何已有文件")
 
 
 class AliyunApi:
@@ -841,21 +874,37 @@ class SyncService:
             stamp = f"{file_id}:{size}:{item.get('updated_at') or item.get('modified_at') or ''}"
             self._set_progress(str(job["id"]), index - 1, len(remote_files), relative_key)
             destination = safe_destination(local_root, relative)
+            remote_sha1 = str(item.get("content_hash") or "").lower()
+            if str(item.get("content_hash_name") or "").lower() != "sha1" or not re.fullmatch(r"[0-9a-f]{40}", remote_sha1):
+                remote_sha1 = ""
+            # Size and timestamps are not evidence of equal content. When the
+            # provider omits a content hash, download and compare actual bytes.
             existing = manifest.get(relative_key)
-            if isinstance(existing, dict) and existing.get("stamp") == stamp and destination.exists() and destination.stat().st_size == size:
-                summary["skipped"] += 1
-                self._set_progress(str(job["id"]), index, len(remote_files), relative_key)
-                continue
-            if destination.exists() and destination.is_file() and destination.stat().st_size == size:
-                manifest[relative_key] = {"stamp": stamp, "fileId": file_id}
-                summary["skipped"] += 1
-                self._set_progress(str(job["id"]), index, len(remote_files), relative_key)
-                continue
-            if destination.exists():
-                destination = safe_destination(local_root, relative.with_name(conflict_name(relative.name, "aliyun")))
-            HttpClient.download(self.api.download_url(access_token, drive_id, file_id), destination)
-            manifest[relative_key] = {"stamp": stamp, "fileId": file_id}
-            summary["copied"] += 1
+            candidates = [destination]
+            if isinstance(existing, dict) and existing.get("target"):
+                candidates.append(safe_destination(local_root, PurePosixPath(str(existing["target"]))))
+            matched = next((path for path in candidates if remote_sha1 and path.is_file()
+                            and path.stat().st_size == size and sha1_for_file(path)[0] == remote_sha1), None)
+            if matched is not None:
+                destination, copied = matched, False
+            else:
+                descriptor, temporary_name = tempfile.mkstemp(prefix=".aliyun-", suffix=".download", dir=destination.parent)
+                os.close(descriptor)
+                temporary = Path(temporary_name)
+                try:
+                    HttpClient.download(self.api.download_url(access_token, drive_id, file_id), temporary)
+                    if temporary.stat().st_size != size:
+                        raise ServiceError(502, "下载文件大小校验失败，未更新备份记录")
+                    if remote_sha1 and sha1_for_file(temporary)[0] != remote_sha1:
+                        raise ServiceError(502, "下载文件内容校验失败，未更新备份记录")
+                    os.chmod(temporary, 0o600)
+                    with temporary.open("rb") as completed:
+                        os.fsync(completed.fileno())
+                    destination, copied = publish_download(temporary, destination, sha256_for_file(temporary))
+                finally:
+                    temporary.unlink(missing_ok=True)
+            manifest[relative_key] = {"stamp": stamp, "fileId": file_id, "target": destination.relative_to(local_root).as_posix()}
+            summary["copied" if copied else "skipped"] += 1
             self._set_progress(str(job["id"]), index, len(remote_files), relative_key)
             self._save_manifest(str(job["id"]), manifest)
         self._save_manifest(str(job["id"]), manifest)
@@ -928,6 +977,11 @@ class ApiHandler(BaseHTTPRequestHandler):
 
     def do_GET(self) -> None:  # noqa: N802
         try:
+            if self.path.split("?", 1)[0] == "/healthz":
+                self._send(200, {"ok": True})
+                return
+            if not self._authorize():
+                return
             route, query = self._route()
             if route == "/api/status":
                 self._send(200, SERVICE.status())
@@ -948,6 +1002,8 @@ class ApiHandler(BaseHTTPRequestHandler):
 
     def do_POST(self) -> None:  # noqa: N802
         try:
+            if not self._authorize(write=True):
+                return
             route, _query = self._route()
             payload = self._read_json()
             if route == "/api/client":
@@ -977,6 +1033,8 @@ class ApiHandler(BaseHTTPRequestHandler):
 
     def do_DELETE(self) -> None:  # noqa: N802
         try:
+            if not self._authorize(write=True):
+                return
             route, _query = self._route()
             if not re.fullmatch(r"/api/jobs/[A-Za-z0-9]+", route):
                 raise ServiceError(404, "接口不存在")
@@ -988,9 +1046,21 @@ class ApiHandler(BaseHTTPRequestHandler):
             self._send(500, {"ok": False, "error": "服务内部错误"})
 
 
+    def _authorize(self, write: bool = False) -> bool:
+        if not trusted_owner(self.headers, getattr(self.server, "owner", ""), getattr(self.server, "proxy_key", "")):
+            self._send(401, {"ok": False, "error": "请通过设备所有者的已验证客户端打开插件"})
+            return False
+        if write and not authorized_write(self.headers):
+            self._send(403, {"ok": False, "error": "请求来源或格式无效"})
+            return False
+        return True
+
+
 def main() -> None:
     ensure_data_dir()
     server = ThreadingHTTPServer((HOST, PORT), ApiHandler)
+    server.owner = os.environ.get("NAS_USER_ID", "")
+    server.proxy_key = load_proxy_key(DATA_DIR.parent / "proxy.key")
     server.daemon_threads = True
     server.serve_forever()
 
