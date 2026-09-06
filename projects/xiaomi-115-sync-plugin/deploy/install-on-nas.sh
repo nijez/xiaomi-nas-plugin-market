@@ -66,7 +66,7 @@ REMOTE_UI="/home/${NAS_USER_ID}/plugin/115sync/src/ui"
 sed "s|__NAS_USER_ID__|${NAS_USER_ID}|g" "${SCRIPT_DIR}/xiaomi-115-sync.nginx.conf" > "${TEMP_NGINX}"
 ssh "${SSH_OPTIONS[@]}" "${REMOTE_TARGET}" "mkdir -p '${REMOTE_RELEASE}' '${REMOTE_UI}' /data/plugin/115-sync/data /data/plugin/www/icon"
 
-tar -C "${PROJECT_DIR}" -czf - server.py requirements.txt requirements.lock wheelhouse | ssh "${SSH_OPTIONS[@]}" "${REMOTE_TARGET}" "tar -xzf - -C '${REMOTE_RELEASE}'"
+tar -C "${PROJECT_DIR}" -czf - server.py requirements.txt requirements.lock wheelhouse pip-bootstrap | ssh "${SSH_OPTIONS[@]}" "${REMOTE_TARGET}" "tar -xzf - -C '${REMOTE_RELEASE}'"
 scp "${SSH_OPTIONS[@]}" "${SECURITY_MODULE}" "${REMOTE_TARGET}:${REMOTE_RELEASE}/plugin_security.py"
 scp "${SSH_OPTIONS[@]}" "${DEPENDENCY_MODULE}" "${REMOTE_TARGET}:${REMOTE_RELEASE}/offline_dependencies.py"
 ssh "${SSH_OPTIONS[@]}" "${REMOTE_TARGET}" "python3 '${REMOTE_RELEASE}/offline_dependencies.py' install --requirements '${REMOTE_RELEASE}/requirements.txt' --target '${REMOTE_RELEASE}/lib'"

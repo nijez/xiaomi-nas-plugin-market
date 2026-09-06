@@ -45,6 +45,37 @@ class OfflineDependencyTests(unittest.TestCase):
         with self.assertRaises(FileExistsError):
             deps.create_lock(self.requirements)
 
+    def test_pip_bootstrap_requires_pinned_digest(self):
+        bootstrap = self.root / 'pip-bootstrap'
+        bootstrap.mkdir()
+        (bootstrap / deps.PIP_WHEEL).write_bytes(b'not the reviewed pip')
+        with self.assertRaisesRegex(deps.DependencyError, 'digest mismatch'):
+            deps.pip_command(self.requirements, self.root, sys.executable)
+
+    def test_pip_bootstrap_rejects_symlink_and_extra_files(self):
+        bootstrap = self.root / 'pip-bootstrap'
+        bootstrap.mkdir()
+        wheel = bootstrap / deps.PIP_WHEEL
+        wheel.symlink_to(self.wheel)
+        with self.assertRaisesRegex(deps.DependencyError, 'Invalid offline pip'):
+            deps.pip_command(self.requirements, self.root, sys.executable)
+        wheel.unlink()
+        wheel.write_bytes(b'fixture')
+        (bootstrap / 'extra.py').write_text('')
+        with self.assertRaisesRegex(deps.DependencyError, 'Invalid offline pip'):
+            deps.pip_command(self.requirements, self.root, sys.executable)
+
+    def test_pip_bootstrap_verified_bytes_are_staged(self):
+        bootstrap = self.root / 'pip-bootstrap'
+        bootstrap.mkdir()
+        body = b'controlled fixture bytes'
+        (bootstrap / deps.PIP_WHEEL).write_bytes(body)
+        import hashlib
+        with patch.object(deps, 'PIP_SHA256', hashlib.sha256(body).hexdigest()):
+            command = deps.pip_command(self.requirements, self.root, sys.executable)
+        self.assertEqual(command, [sys.executable, '-I', str(self.root / deps.PIP_WHEEL / 'pip')])
+        self.assertEqual((self.root / deps.PIP_WHEEL).read_bytes(), body)
+
     def test_changed_wheel_is_rejected(self):
         with zipfile.ZipFile(self.wheel, "a") as archive:
             archive.writestr("unexpected.txt", "changed bytes")

@@ -246,7 +246,10 @@ def sign(payload: Path, private_key: Path, signature: Path) -> None:
 def check_dependencies(spec: dict[str, Any]) -> None:
     if spec.get("requirements"):
         try:
-            verify_bundle(Path(spec["project"]) / "requirements.txt")
+            requirements = Path(spec["project"]) / "requirements.txt"
+            verify_bundle(requirements)
+            from offline_dependencies import verify_pip_bootstrap
+            verify_pip_bootstrap(requirements)
         except DependencyError as error:
             raise SystemExit(f"Dependency release gate ({spec['id']}): {error}") from error
 
@@ -257,7 +260,7 @@ def populate_payload(spec: dict[str, Any], root: Path) -> None:
     for source, destination in spec["runtime"].items():
         copy_required(project / source, root / "runtime" / destination)
     if spec.get("requirements"):
-        for name in ("requirements.lock", "wheelhouse"):
+        for name in ("requirements.lock", "wheelhouse", "pip-bootstrap"):
             copy_required(project / name, root / "runtime" / name)
         copy_required(PROJECT.parents[1] / "shared/offline_dependencies.py", root / "runtime/offline_dependencies.py")
     if spec["id"] in {"115sync", "aliyundrivesync", "webdav", "qbittorrent"}:

@@ -21,6 +21,31 @@ class DependencyError(RuntimeError):
 PIN = re.compile(r"([A-Za-z0-9][A-Za-z0-9._-]*)==([A-Za-z0-9][A-Za-z0-9.!+_-]*)")
 HASH = re.compile(r"--hash=sha256:([0-9a-f]{64})")
 WHEEL = re.compile(r"([A-Za-z0-9_]+)-([A-Za-z0-9_.!+]+)-(?:[0-9][A-Za-z0-9_]*-)?[A-Za-z0-9_.]+-[A-Za-z0-9_.]+-[A-Za-z0-9_.]+\.whl")
+PIP_WHEEL = 'pip-25.2-py3-none-any.whl'
+PIP_SHA256 = '6d67a2b4e7f14d8b31b8b52648866fa717f45a1eb70e83002f4331d07e953717'
+
+
+def verify_pip_bootstrap(requirements: Path) -> bytes:
+    bootstrap = requirements.parent / 'pip-bootstrap'
+    wheel = bootstrap / PIP_WHEEL
+    if (bootstrap.is_symlink() or not bootstrap.is_dir() or wheel.is_symlink()
+            or not wheel.is_file() or set(bootstrap.iterdir()) != {wheel}):
+        raise DependencyError('Invalid offline pip bootstrap')
+    body = wheel.read_bytes()
+    if hashlib.sha256(body).hexdigest() != PIP_SHA256:
+        raise DependencyError('Offline pip bootstrap digest mismatch')
+    return body
+
+
+def pip_command(requirements: Path, stage: Path, python: str) -> list:
+    bootstrap = requirements.parent / 'pip-bootstrap'
+    if not bootstrap.exists() and not bootstrap.is_symlink():
+        return [python, '-I', '-m', 'pip']
+    body = verify_pip_bootstrap(requirements)
+    copied = stage / PIP_WHEEL
+    copied.write_bytes(body)
+    # Python executes __main__.py from the verified wheel without user site imports.
+    return [python, '-I', str(copied / 'pip')]
 
 
 def canonical(name: str) -> str:
@@ -125,7 +150,7 @@ def install_bundle(requirements: Path, target: Path, python: str = sys.executabl
         verify_bundle(stage / "requirements.txt")
         environment = {key: value for key, value in os.environ.items() if not key.startswith(("PIP_", "PYTHON"))}
         environment["PIP_CONFIG_FILE"] = os.devnull
-        command = [python, "-I", "-m", "pip", "--isolated", "install", "--disable-pip-version-check",
+        command = pip_command(requirements, stage, python) + ["--isolated", "install", "--disable-pip-version-check",
                    "--no-input", "--no-index", "--no-cache-dir", "--only-binary=:all:", "--require-hashes",
                    "--ignore-installed", "--no-compile", "--no-warn-script-location",
                    "--find-links", str(wheels), "--target", str(stage / "lib"), "-r", str(lock)]
