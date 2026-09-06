@@ -155,7 +155,7 @@ class StoreHandler(BaseHTTPRequestHandler):
         if path == "/api/status":
             if not self._require_session():
                 return
-            self._json(HTTPStatus.OK, {"ok": True, "version": "0.1.3", "mode": "preview" if self.app.dev else "active"})
+            self._json(HTTPStatus.OK, {"ok": True, "version": "0.1.3-beta.1", "mode": "preview" if self.app.dev else "active"})
             return
         if path == "/healthz":
             self._json(HTTPStatus.OK, {"ok": True})

@@ -7,6 +7,7 @@ import unittest
 import zipfile
 from unittest.mock import patch
 from pathlib import Path
+from offline_dependencies import verify_bundle
 
 from storelib import (
     InstallManager,
@@ -26,6 +27,9 @@ PUBLIC_KEY = CATALOG / "repository-public.pem"
 
 class StoreLibraryTests(unittest.TestCase):
     def test_old_online_requirements_bundle_cannot_activate(self) -> None:
+        def without_lock(requirements):
+            requirements.with_name('requirements.lock').unlink(missing_ok=True)
+            return verify_bundle(requirements)
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
             registry = root / "data/plugin/u_test.list"
@@ -33,7 +37,8 @@ class StoreLibraryTests(unittest.TestCase):
             registry.write_text("{}\n")
             manager = InstallManager(CATALOG, PUBLIC_KEY, "u_test", root=root, execute_system=True)
             with patch.object(manager, "_service_state", return_value=(False, "disabled")), \
-                 patch.object(manager, "_run") as run:
+                 patch.object(manager, "_run") as run, \
+                 patch('storelib.verify_bundle', side_effect=without_lock):
                 with self.assertRaisesRegex(StoreError, "requirements.lock"):
                     manager.install("115sync")
                 run.assert_not_called()
@@ -104,7 +109,7 @@ class StoreLibraryTests(unittest.TestCase):
             self.assertTrue(result["ok"])
             self.assertIn("aliyundrivesync", json.loads(registry.read_text(encoding="utf-8")))
             self.assertEqual(
-                {"version": "0.1.0", "managed": True},
+                {"version": next(p['version'] for p in load_verified_catalog(CATALOG, PUBLIC_KEY)['packages'] if p['id'] == 'aliyundrivesync'), "managed": True},
                 manager.inventory()["aliyundrivesync"],
             )
             current = root / "data/plugin/aliyundrive-sync/current"

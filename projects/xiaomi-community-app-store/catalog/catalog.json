@@ -1,62 +1,62 @@
 {
   "schemaVersion": 1,
   "name": "小米智能存储插件市场",
-  "generatedAt": 1788528323,
+  "generatedAt": 1788679817,
   "packages": [
     {
       "id": "qbittorrent",
       "name": "qB 下载",
-      "version": "0.1.0-rc1",
+      "version": "0.1.0-rc2",
       "summary": "磁力与种子下载、暂停继续和限速；首次启动需拉取独立 Docker 镜像",
-      "bundle": "bundles/qbittorrent-0.1.0-rc1.bundle.zip",
-      "signature": "bundles/qbittorrent-0.1.0-rc1.bundle.zip.sig",
-      "sha256": "884b103d4430de3e0ffea8d8aef1c2e781affbd9c440d5dd33b97cc586d0ca07",
+      "bundle": "bundles/qbittorrent-0.1.0-rc2.bundle.zip",
+      "signature": "bundles/qbittorrent-0.1.0-rc2.bundle.zip.sig",
+      "sha256": "49172ca27c92f2b0924b607d0dd39e1ec3f0b4b79bd3164ef5a4bdb0a0f64b35",
       "icon": "icons/qbittorrent.png",
       "channel": "candidate"
     },
     {
       "id": "webdav",
       "name": "WebDAV 文件桥",
-      "version": "0.2.0-rc5",
+      "version": "0.2.0-rc6",
       "summary": "NAS HTTPS 文件共享，以及远程 WebDAV 上传、下载与定时备份",
-      "bundle": "bundles/webdav-0.2.0-rc5.bundle.zip",
-      "signature": "bundles/webdav-0.2.0-rc5.bundle.zip.sig",
-      "sha256": "b5b8c46aeda57bac2327b391c1c855edf648a8e31ea0b5e66fc08112b6cd5d29",
+      "bundle": "bundles/webdav-0.2.0-rc6.bundle.zip",
+      "signature": "bundles/webdav-0.2.0-rc6.bundle.zip.sig",
+      "sha256": "3f36389fcfa28ffa5ce96f601d85bcbe47efe71140560cd945fd9cbe22b2cda4",
       "icon": "icons/webdav.png",
       "channel": "candidate"
     },
     {
       "id": "devicemanager",
       "name": "设备管家",
-      "version": "0.4.1",
+      "version": "0.4.2-beta.1",
       "summary": "2 秒实时监控系统、网络、磁盘健康与 Docker 容器资源",
-      "bundle": "bundles/devicemanager-0.4.1.bundle.zip",
-      "signature": "bundles/devicemanager-0.4.1.bundle.zip.sig",
-      "sha256": "6bf2687ffcb0e807c5d5e6d51a6d6033f314b1927a95b6c4e2066b66a7d585da",
+      "bundle": "bundles/devicemanager-0.4.2-beta.1.bundle.zip",
+      "signature": "bundles/devicemanager-0.4.2-beta.1.bundle.zip.sig",
+      "sha256": "db3dbb0fafb857c9d775377b21306cbcb0f403a37b0291ab3aa4e106f5cae5ce",
       "icon": "icons/devicemanager.png",
-      "channel": "stable"
+      "channel": "candidate"
     },
     {
       "id": "115sync",
       "name": "115 云备份",
-      "version": "0.1.0",
+      "version": "0.1.1-beta.1",
       "summary": "使用 115 官方 OpenAPI 同步与备份 NAS 文件",
-      "bundle": "bundles/115sync-0.1.0.bundle.zip",
-      "signature": "bundles/115sync-0.1.0.bundle.zip.sig",
-      "sha256": "e8571a51479e51ed735cfadd1074a1cf432591829df45a799c856b2d7ce1ce43",
+      "bundle": "bundles/115sync-0.1.1-beta.1.bundle.zip",
+      "signature": "bundles/115sync-0.1.1-beta.1.bundle.zip.sig",
+      "sha256": "ca10130ba1f97e53cf3116e27651bd2ea6b7f00c0996afb0ea693e1246daa7ce",
       "icon": "icons/115sync.png",
-      "channel": "stable"
+      "channel": "candidate"
     },
     {
       "id": "aliyundrivesync",
       "name": "阿里云盘备份",
-      "version": "0.1.0",
+      "version": "0.1.1-beta.1",
       "summary": "扫码连接阿里云盘并同步 NAS 文件",
-      "bundle": "bundles/aliyundrivesync-0.1.0.bundle.zip",
-      "signature": "bundles/aliyundrivesync-0.1.0.bundle.zip.sig",
-      "sha256": "d7065518a84ef0bc9333a0ec67a769348efa91bc2dce8b58df128ab79be01e9b",
+      "bundle": "bundles/aliyundrivesync-0.1.1-beta.1.bundle.zip",
+      "signature": "bundles/aliyundrivesync-0.1.1-beta.1.bundle.zip.sig",
+      "sha256": "a704c03a771e1c2565beba3825b31abffc90e1b211889bf350435e30225a08f4",
       "icon": "icons/aliyundrivesync.png",
-      "channel": "stable"
+      "channel": "candidate"
     }
   ]
 }

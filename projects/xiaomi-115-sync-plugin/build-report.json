@@ -1,0 +1,229 @@
+{
+  "python": "3.12.14",
+  "architecture": "aarch64",
+  "libc": [
+    "glibc",
+    "2.36"
+  ],
+  "inputs": [
+    {
+      "name": "oss2",
+      "version": "2.19.1",
+      "group": "runtime",
+      "path": "sources/oss2-2.19.1.tar.gz",
+      "sha256": "a8ab9ee7eb99e88a7e1382edc6ea641d219d585a7e074e3776e9dec9473e59c1",
+      "size": 298845,
+      "url": "https://files.pythonhosted.org/packages/df/b5/f2cb1950dda46ac2284d6c950489fdacd0e743c2d79a347924d3cc44b86f/oss2-2.19.1.tar.gz",
+      "metadata": "https://pypi.org/pypi/oss2/2.19.1/json"
+    },
+    {
+      "name": "cryptography",
+      "version": "50.0.1",
+      "group": "runtime",
+      "path": "runtime-wheels/cryptography-50.0.1-cp311-abi3-manylinux_2_34_aarch64.whl",
+      "sha256": "e2ca8fd1b6b4b82a1c4cb02841d0837e3c12336c2e24b520ab8ab3b969733d8f",
+      "size": 4730028,
+      "url": "https://files.pythonhosted.org/packages/39/3b/e96c1ef71edef71057c7e3c3d982ce8fda554e0c52d0cc19c18845cde3eb/cryptography-50.0.1-cp311-abi3-manylinux_2_34_aarch64.whl",
+      "metadata": "https://pypi.org/pypi/cryptography/50.0.1/json"
+    },
+    {
+      "name": "pyOpenSSL",
+      "version": "26.4.0",
+      "group": "runtime",
+      "path": "runtime-wheels/pyopenssl-26.4.0-py3-none-any.whl",
+      "sha256": "f0eb0cb2d581d3ad2b9c489468485e7f2ab6727d08401bcf9d824c3caddf3c1c",
+      "size": 56026,
+      "url": "https://files.pythonhosted.org/packages/51/ad/2cf6d3fa2fae5c79e1ed9960c0d42badd0f94d81dd12b50604cdc839e648/pyopenssl-26.4.0-py3-none-any.whl",
+      "metadata": "https://pypi.org/pypi/pyOpenSSL/26.4.0/json"
+    },
+    {
+      "name": "requests",
+      "version": "2.34.2",
+      "group": "runtime",
+      "path": "runtime-wheels/requests-2.34.2-py3-none-any.whl",
+      "sha256": "2a0d60c172f83ac6ab31e4554906c0f3b3588d37b5cb939b1c061f4907e278e0",
+      "size": 73075,
+      "url": "https://files.pythonhosted.org/packages/a0/f4/c67b0b3f1b9245e8d266f0f112c500d50e5b4e83cb6f3b71b6528104182a/requests-2.34.2-py3-none-any.whl",
+      "metadata": "https://pypi.org/pypi/requests/2.34.2/json"
+    },
+    {
+      "name": "urllib3",
+      "version": "2.7.0",
+      "group": "runtime",
+      "path": "runtime-wheels/urllib3-2.7.0-py3-none-any.whl",
+      "sha256": "9fb4c81ebbb1ce9531cce37674bbc6f1360472bc18ca9a553ede278ef7276897",
+      "size": 131087,
+      "url": "https://files.pythonhosted.org/packages/7f/3e/5db95bcf282c52709639744ca2a8b149baccf648e39c8cc87553df9eae0c/urllib3-2.7.0-py3-none-any.whl",
+      "metadata": "https://pypi.org/pypi/urllib3/2.7.0/json"
+    },
+    {
+      "name": "crcmod",
+      "version": "1.7",
+      "group": "runtime",
+      "path": "sources/crcmod-1.7.tar.gz",
+      "sha256": "dc7051a0db5f2bd48665a990d3ec1cc305a466a77358ca4492826f41f283601e",
+      "size": 89670,
+      "url": "https://files.pythonhosted.org/packages/6b/b0/e595ce2a2527e169c3bcd6c33d2473c1918e0b7f6826a043ca1245dd4e5b/crcmod-1.7.tar.gz",
+      "metadata": "https://pypi.org/pypi/crcmod/1.7/json"
+    },
+    {
+      "name": "pycryptodome",
+      "version": "3.23.0",
+      "group": "runtime",
+      "path": "runtime-wheels/pycryptodome-3.23.0-cp37-abi3-manylinux_2_17_aarch64.manylinux2014_aarch64.whl",
+      "sha256": "67bd81fcbe34f43ad9422ee8fd4843c8e7198dd88dd3d40e6de42ee65fbe1490",
+      "size": 2182625,
+      "url": "https://files.pythonhosted.org/packages/50/52/adaf4c8c100a8c49d2bd058e5b551f73dfd8cb89eb4911e25a0c469b6b4e/pycryptodome-3.23.0-cp37-abi3-manylinux_2_17_aarch64.manylinux2014_aarch64.whl",
+      "metadata": "https://pypi.org/pypi/pycryptodome/3.23.0/json"
+    },
+    {
+      "name": "aliyun-python-sdk-core",
+      "version": "2.16.1",
+      "group": "runtime",
+      "path": "runtime-wheels/aliyun_python_sdk_core-2.16.1-py3-none-any.whl",
+      "sha256": "0f25a6e8ec1ea29c76610278cff81cbff85149a6e692bf2398a6f9b77e5e7424",
+      "size": 521331,
+      "url": "https://files.pythonhosted.org/packages/ea/38/eb3be49159d6442e68189f21a2205a199b51ca46cf42a3f874e695ff0ba9/aliyun_python_sdk_core-2.16.1-py3-none-any.whl",
+      "metadata": "https://pypi.org/pypi/aliyun-python-sdk-core/2.16.1/json"
+    },
+    {
+      "name": "aliyun-python-sdk-kms",
+      "version": "2.16.5",
+      "group": "runtime",
+      "path": "runtime-wheels/aliyun_python_sdk_kms-2.16.5-py2.py3-none-any.whl",
+      "sha256": "24b6cdc4fd161d2942619479c8d050c63ea9cd22b044fe33b60bbb60153786f0",
+      "size": 99495,
+      "url": "https://files.pythonhosted.org/packages/11/5c/0132193d7da2c735669a1ed103b142fd63c9455984d48c5a88a1a516efaa/aliyun_python_sdk_kms-2.16.5-py2.py3-none-any.whl",
+      "metadata": "https://pypi.org/pypi/aliyun-python-sdk-kms/2.16.5/json"
+    },
+    {
+      "name": "six",
+      "version": "1.17.0",
+      "group": "runtime",
+      "path": "runtime-wheels/six-1.17.0-py2.py3-none-any.whl",
+      "sha256": "4721f391ed90541fddacab5acf947aa0d3dc7d27b2e1e8eda2be8970586c3274",
+      "size": 11050,
+      "url": "https://files.pythonhosted.org/packages/b7/ce/149a00dd41f10bc29e5921b496af8b574d8413afcd5e30dfa0ed46c2cc5e/six-1.17.0-py2.py3-none-any.whl",
+      "metadata": "https://pypi.org/pypi/six/1.17.0/json"
+    },
+    {
+      "name": "cffi",
+      "version": "2.1.1",
+      "group": "runtime",
+      "path": "runtime-wheels/cffi-2.1.1-cp312-cp312-manylinux2014_aarch64.manylinux_2_17_aarch64.whl",
+      "sha256": "68e62fe11f30d5ca8289242866f0a5291402d8529ca2178ab8afc5c9694ae890",
+      "size": 222389,
+      "url": "https://files.pythonhosted.org/packages/44/de/f98430906df1545ffde0d543dd124a7a439bc2cd32b36b9c53f805df7333/cffi-2.1.1-cp312-cp312-manylinux2014_aarch64.manylinux_2_17_aarch64.whl",
+      "metadata": "https://pypi.org/pypi/cffi/2.1.1/json"
+    },
+    {
+      "name": "typing-extensions",
+      "version": "4.16.0",
+      "group": "runtime",
+      "path": "runtime-wheels/typing_extensions-4.16.0-py3-none-any.whl",
+      "sha256": "481caa481374e813c1b176ada14e97f1f67a4539ce9cfeb3f350d78d6370c2e8",
+      "size": 45571,
+      "url": "https://files.pythonhosted.org/packages/49/d3/b8441a820a491ddfc024b0b0cf0393375b75ea13866d9c66727e54c2fc80/typing_extensions-4.16.0-py3-none-any.whl",
+      "metadata": "https://pypi.org/pypi/typing-extensions/4.16.0/json"
+    },
+    {
+      "name": "charset-normalizer",
+      "version": "3.5.1",
+      "group": "runtime",
+      "path": "runtime-wheels/charset_normalizer-3.5.1-cp312-cp312-manylinux2014_aarch64.manylinux_2_17_aarch64.manylinux_2_28_aarch64.whl",
+      "sha256": "4582c27e8c889d64811987b5967fbd3ae0c823fe1fd933b543d55ac20bb475fa",
+      "size": 238530,
+      "url": "https://files.pythonhosted.org/packages/9a/4c/be49ada26b1f0232d57aa89bbebf997a5cc2332a5616b6eca26ff680044d/charset_normalizer-3.5.1-cp312-cp312-manylinux2014_aarch64.manylinux_2_17_aarch64.manylinux_2_28_aarch64.whl",
+      "metadata": "https://pypi.org/pypi/charset-normalizer/3.5.1/json"
+    },
+    {
+      "name": "idna",
+      "version": "3.19",
+      "group": "runtime",
+      "path": "runtime-wheels/idna-3.19-py3-none-any.whl",
+      "sha256": "815e7be7a7806d54abb586dc943addc79e8b2ee16915059658cbeff4b1b43bf4",
+      "size": 68550,
+      "url": "https://files.pythonhosted.org/packages/57/b0/0e52c878c53f245edd3a11020f20979b3f490f245af532c7cae3027754b5/idna-3.19-py3-none-any.whl",
+      "metadata": "https://pypi.org/pypi/idna/3.19/json"
+    },
+    {
+      "name": "certifi",
+      "version": "2026.7.22",
+      "group": "runtime",
+      "path": "runtime-wheels/certifi-2026.7.22-py3-none-any.whl",
+      "sha256": "62f22742b58a1a33014a2b6b706588a8d7e2a88ae7bd1a6ebe8c992928483775",
+      "size": 136983,
+      "url": "https://files.pythonhosted.org/packages/0b/a7/71ac2cff56fec219ed242bb11b8efb69fcc4bec75db06fb7bfe35de520e6/certifi-2026.7.22-py3-none-any.whl",
+      "metadata": "https://pypi.org/pypi/certifi/2026.7.22/json"
+    },
+    {
+      "name": "jmespath",
+      "version": "1.1.0",
+      "group": "runtime",
+      "path": "runtime-wheels/jmespath-1.1.0-py3-none-any.whl",
+      "sha256": "a5663118de4908c91729bea0acadca56526eb2698e83de10cd116ae0f4e97c64",
+      "size": 20419,
+      "url": "https://files.pythonhosted.org/packages/14/2f/967ba146e6d58cf6a652da73885f52fc68001525b4197effc174321d70b4/jmespath-1.1.0-py3-none-any.whl",
+      "metadata": "https://pypi.org/pypi/jmespath/1.1.0/json"
+    },
+    {
+      "name": "pycparser",
+      "version": "3.0",
+      "group": "runtime",
+      "path": "runtime-wheels/pycparser-3.0-py3-none-any.whl",
+      "sha256": "b727414169a36b7d524c1c3e31839a521725078d7b2ff038656844266160a992",
+      "size": 48172,
+      "url": "https://files.pythonhosted.org/packages/0c/c3/44f3fbbfa403ea2a7c779186dc20772604442dde72947e7d01069cbe98e3/pycparser-3.0-py3-none-any.whl",
+      "metadata": "https://pypi.org/pypi/pycparser/3.0/json"
+    },
+    {
+      "name": "setuptools",
+      "version": "80.9.0",
+      "group": "build",
+      "path": "build-wheels/setuptools-80.9.0-py3-none-any.whl",
+      "sha256": "062d34222ad13e0cc312a4c02d73f059e86a4acbfbdea8f8f76b28c99f306922",
+      "size": 1201486,
+      "url": "https://files.pythonhosted.org/packages/a3/dc/17031897dae0efacfea57dfd3a82fdd2a2aeb58e0ff71b77b87e44edc772/setuptools-80.9.0-py3-none-any.whl",
+      "metadata": "https://pypi.org/pypi/setuptools/80.9.0/json"
+    },
+    {
+      "name": "wheel",
+      "version": "0.45.1",
+      "group": "build",
+      "path": "build-wheels/wheel-0.45.1-py3-none-any.whl",
+      "sha256": "708e7481cc80179af0e556bbf0cc00b8444c7321e2700b8d8580231d13017248",
+      "size": 72494,
+      "url": "https://files.pythonhosted.org/packages/0b/2c/87f3254fd8ffd29e4c02732eee68a83a1d3c346ae39bc6822dcbcb697f2b/wheel-0.45.1-py3-none-any.whl",
+      "metadata": "https://pypi.org/pypi/wheel/0.45.1/json"
+    },
+    {
+      "name": "packaging",
+      "version": "25.0",
+      "group": "build",
+      "path": "build-wheels/packaging-25.0-py3-none-any.whl",
+      "sha256": "29572ef2b1f17581046b3a2227d5c611fb25ec70ca1ba8554b24b0e69331a484",
+      "size": 66469,
+      "url": "https://files.pythonhosted.org/packages/20/12/38679034af332785aac8774540895e234f4d07f7545804097de4b666afd8/packaging-25.0-py3-none-any.whl",
+      "metadata": "https://pypi.org/pypi/packaging/25.0/json"
+    }
+  ],
+  "wheels": {
+    "aliyun_python_sdk_core-2.16.1-py3-none-any.whl": "0f25a6e8ec1ea29c76610278cff81cbff85149a6e692bf2398a6f9b77e5e7424",
+    "aliyun_python_sdk_kms-2.16.5-py2.py3-none-any.whl": "24b6cdc4fd161d2942619479c8d050c63ea9cd22b044fe33b60bbb60153786f0",
+    "certifi-2026.7.22-py3-none-any.whl": "62f22742b58a1a33014a2b6b706588a8d7e2a88ae7bd1a6ebe8c992928483775",
+    "cffi-2.1.1-cp312-cp312-manylinux2014_aarch64.manylinux_2_17_aarch64.whl": "68e62fe11f30d5ca8289242866f0a5291402d8529ca2178ab8afc5c9694ae890",
+    "charset_normalizer-3.5.1-cp312-cp312-manylinux2014_aarch64.manylinux_2_17_aarch64.manylinux_2_28_aarch64.whl": "4582c27e8c889d64811987b5967fbd3ae0c823fe1fd933b543d55ac20bb475fa",
+    "crcmod-1.7-cp312-cp312-linux_aarch64.whl": "0a1bcc5fe41a28dbc6c97e326a2eaef65e887c03b3496f5bb3fac39081599347",
+    "cryptography-50.0.1-cp311-abi3-manylinux_2_34_aarch64.whl": "e2ca8fd1b6b4b82a1c4cb02841d0837e3c12336c2e24b520ab8ab3b969733d8f",
+    "idna-3.19-py3-none-any.whl": "815e7be7a7806d54abb586dc943addc79e8b2ee16915059658cbeff4b1b43bf4",
+    "jmespath-1.1.0-py3-none-any.whl": "a5663118de4908c91729bea0acadca56526eb2698e83de10cd116ae0f4e97c64",
+    "oss2-2.19.1-py3-none-any.whl": "f6496bf60b17a627bf6df5e1c731f2341bb4a0f2459a79d924eb96cd3f86fd60",
+    "pycparser-3.0-py3-none-any.whl": "b727414169a36b7d524c1c3e31839a521725078d7b2ff038656844266160a992",
+    "pycryptodome-3.23.0-cp37-abi3-manylinux_2_17_aarch64.manylinux2014_aarch64.whl": "67bd81fcbe34f43ad9422ee8fd4843c8e7198dd88dd3d40e6de42ee65fbe1490",
+    "pyopenssl-26.4.0-py3-none-any.whl": "f0eb0cb2d581d3ad2b9c489468485e7f2ab6727d08401bcf9d824c3caddf3c1c",
+    "requests-2.34.2-py3-none-any.whl": "2a0d60c172f83ac6ab31e4554906c0f3b3588d37b5cb939b1c061f4907e278e0",
+    "six-1.17.0-py2.py3-none-any.whl": "4721f391ed90541fddacab5acf947aa0d3dc7d27b2e1e8eda2be8970586c3274",
+    "typing_extensions-4.16.0-py3-none-any.whl": "481caa481374e813c1b176ada14e97f1f67a4539ce9cfeb3f350d78d6370c2e8",
+    "urllib3-2.7.0-py3-none-any.whl": "9fb4c81ebbb1ce9531cce37674bbc6f1360472bc18ca9a553ede278ef7276897"
+  }
+}

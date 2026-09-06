@@ -26,7 +26,7 @@ from offline_dependencies import DependencyError, verify_bundle
 
 PACKAGE_SPECS: list[dict[str, Any]] = [
     {
-        "id": "qbittorrent", "name": "qB 下载", "version": "0.1.0-rc1",
+        "id": "qbittorrent", "name": "qB 下载", "version": "0.1.0-rc2",
         "summary": "磁力与种子下载、暂停继续和限速；首次启动需拉取独立 Docker 镜像",
         "project": WORK / "xiaomi-qbittorrent-plugin", "pluginId": 11004, "port": 18122,
         "releaseRoot": "/data/plugin/qbittorrent", "uiKey": "qbittorrent",
@@ -48,7 +48,7 @@ PACKAGE_SPECS: list[dict[str, Any]] = [
     {
         "id": "webdav",
         "name": "WebDAV 文件桥",
-        "version": "0.2.0-rc5",
+        "version": "0.2.0-rc6",
         "summary": "NAS HTTPS 文件共享，以及远程 WebDAV 上传、下载与定时备份",
         "project": WORK / "xiaomi-webdav-plugin",
         "pluginId": 11003,
@@ -81,7 +81,7 @@ PACKAGE_SPECS: list[dict[str, Any]] = [
     {
         "id": "devicemanager",
         "name": "设备管家",
-        "version": "0.4.1",
+        "version": "0.4.2-beta.1",
         "summary": "2 秒实时监控系统、网络、磁盘健康与 Docker 容器资源",
         "project": WORK / "xiaomi-device-manager-prototype",
         "pluginId": 11001,
@@ -127,7 +127,7 @@ PACKAGE_SPECS: list[dict[str, Any]] = [
     {
         "id": "115sync",
         "name": "115 云备份",
-        "version": "0.1.0",
+        "version": "0.1.1-beta.1",
         "summary": "使用 115 官方 OpenAPI 同步与备份 NAS 文件",
         "project": WORK / "xiaomi-115-sync-plugin",
         "pluginId": 1000,
@@ -164,7 +164,7 @@ PACKAGE_SPECS: list[dict[str, Any]] = [
     {
         "id": "aliyundrivesync",
         "name": "阿里云盘备份",
-        "version": "0.1.0",
+        "version": "0.1.1-beta.1",
         "summary": "扫码连接阿里云盘并同步 NAS 文件",
         "project": WORK / "xiaomi-aliyundrive-sync-plugin",
         "pluginId": 1002,
@@ -339,7 +339,7 @@ def build_bundle(spec: dict[str, Any], private_key: Path) -> dict[str, Any]:
         "signature": f"bundles/{signature.name}",
         "sha256": digest,
         "icon": f"icons/{icon_name}",
-        "channel": "candidate" if "-rc" in spec["version"] else "stable",
+        "channel": "candidate" if "-" in spec["version"] else "stable",
     }
 
 
@@ -355,7 +355,7 @@ def main() -> int:
         CATALOG = args.output.expanduser().resolve()
     if args.include_candidates and (not args.output or CATALOG == PROJECT / 'catalog'):
         raise SystemExit('Candidate publication requires a separate --output directory')
-    if any('-rc' in spec['version'] for spec in PACKAGE_SPECS) and not args.include_candidates:
+    if any('-' in spec['version'] for spec in PACKAGE_SPECS) and not args.include_candidates:
         raise SystemExit('Candidate package present: use the plugin candidate builder; stable catalog was not updated')
     for spec in PACKAGE_SPECS:
         check_dependencies(spec)

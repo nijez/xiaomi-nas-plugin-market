@@ -3,6 +3,11 @@ from pathlib import Path
 import subprocess
 import tempfile
 import unittest
+import io
+import json
+import hashlib
+import zipfile
+from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parents[1]
 spec = importlib.util.spec_from_file_location('staged_privacy_fixture', ROOT / 'scripts/verify_release.py')
@@ -57,6 +62,33 @@ class StagedPrivacyTests(unittest.TestCase):
         self.git('add', 'link')
         scanner.inspect_staged(self.root)
         self.assertIn(('link', 'non-regular staged file'), scanner.findings)
+
+    def wheel_fixture(self, member='demo.py', content=b'public fixture'):
+        stream = io.BytesIO()
+        with zipfile.ZipFile(stream, 'w') as archive:
+            archive.writestr(member, content)
+        body = stream.getvalue()
+        report = self.root / 'projects/xiaomi-115-sync-plugin/build-report.json'
+        report.parent.mkdir(parents=True, exist_ok=True)
+        report.write_text(json.dumps({'wheels': {'demo-1.0-py3-none-any.whl': hashlib.sha256(body).hexdigest()}}))
+        return body
+
+    def test_wheel_requires_reviewed_digest(self):
+        body = self.wheel_fixture()
+        with patch.object(scanner, 'ROOT', self.root):
+            scanner.inspect('demo-1.0-py3-none-any.whl', body)
+            with self.assertRaisesRegex(ValueError, 'Unreviewed'):
+                scanner.inspect('demo-1.0-py3-none-any.whl', body + b'changed')
+
+    def test_reviewed_wheel_still_rejects_path_traversal(self):
+        body = self.wheel_fixture('../outside.py')
+        with patch.object(scanner, 'ROOT', self.root), self.assertRaisesRegex(ValueError, 'Unsafe'):
+            scanner.inspect('demo-1.0-py3-none-any.whl', body)
+
+    def test_reviewed_wheel_rejects_wrong_native_architecture(self):
+        body = self.wheel_fixture('native.so', b'not-an-arm64-elf')
+        with patch.object(scanner, 'ROOT', self.root), self.assertRaisesRegex(ValueError, 'Linux ARM64'):
+            scanner.inspect('demo-1.0-py3-none-any.whl', body)
 
 
 if __name__ == '__main__':

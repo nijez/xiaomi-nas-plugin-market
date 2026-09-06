@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import hashlib
+import json
 import shutil
 import tempfile
 import zipfile
@@ -12,7 +13,7 @@ from build_repository import assert_catalog_matches_sources
 
 
 PROJECT = Path(__file__).resolve().parents[1]
-VERSION = "0.1.3"
+VERSION = "0.1.3-beta.1"
 DIST = PROJECT / "dist"
 PACKAGE_NAME = f"xiaomi-plugin-market-{VERSION}"
 INCLUDE = [
@@ -44,7 +45,18 @@ def main() -> int:
         for relative in INCLUDE:
             source = PROJECT / relative
             destination = root / relative
-            if source.is_dir():
+            if relative == 'catalog':
+                shutil.copytree(source, destination, ignore=shutil.ignore_patterns('bundles', '__pycache__', '*.pyc'))
+                catalog = json.loads((source / 'catalog.json').read_text())
+                for package in catalog['packages']:
+                    for key in ('bundle', 'signature'):
+                        member = Path(package[key])
+                        if member.is_absolute() or '..' in member.parts or member.parts[0] != 'bundles':
+                            raise ValueError('Invalid catalog payload path')
+                        target_member = destination / member
+                        target_member.parent.mkdir(parents=True, exist_ok=True)
+                        shutil.copy2(source / member, target_member)
+            elif source.is_dir():
                 shutil.copytree(source, destination, ignore=shutil.ignore_patterns("__pycache__", "*.pyc"))
             else:
                 shutil.copy2(source, destination)
