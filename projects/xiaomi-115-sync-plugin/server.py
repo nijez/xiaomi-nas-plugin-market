@@ -15,6 +15,7 @@ import os
 import re
 import secrets
 import shutil
+import sys
 import threading
 import time
 import uuid
@@ -27,6 +28,10 @@ from typing import Any, Callable
 from urllib.error import HTTPError, URLError
 from urllib.parse import parse_qs, urlencode, urlparse
 from urllib.request import Request, urlopen
+
+if (Path(__file__).resolve().parents[2] / "shared").is_dir():
+    sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "shared"))
+from plugin_security import load_proxy_key, trusted_owner, authorized_write
 
 
 HOST = os.environ.get("HOST", "127.0.0.1")
@@ -986,6 +991,11 @@ class ApiHandler(BaseHTTPRequestHandler):
 
     def do_GET(self) -> None:  # noqa: N802
         try:
+            if urlparse(self.path).path == "/healthz":
+                self._json(200, {"ok": True})
+                return
+            if not self._authorize():
+                return
             route, query = self._route()
             if route == "status":
                 payload = SERVICE.status()
@@ -1008,6 +1018,8 @@ class ApiHandler(BaseHTTPRequestHandler):
 
     def do_POST(self) -> None:  # noqa: N802
         try:
+            if not self._authorize(write=True):
+                return
             route, _query = self._route()
             body = self._body()
             if route == "config/client":
@@ -1038,8 +1050,20 @@ class ApiHandler(BaseHTTPRequestHandler):
             self._json(HTTPStatus.INTERNAL_SERVER_ERROR, {"ok": False, "error": "Internal server error"})
 
 
+    def _authorize(self, write: bool = False) -> bool:
+        if not trusted_owner(self.headers, getattr(self.server, "owner", ""), getattr(self.server, "proxy_key", "")):
+            self._json(401, {"ok": False, "error": "请通过设备所有者的已验证客户端打开插件"})
+            return False
+        if write and not authorized_write(self.headers):
+            self._json(403, {"ok": False, "error": "请求来源或格式无效"})
+            return False
+        return True
+
+
 def main() -> None:
     server = ThreadingHTTPServer((HOST, PORT), ApiHandler)
+    server.owner = os.environ.get("NAS_USER_ID", "")
+    server.proxy_key = load_proxy_key(DATA_DIR.parent / "proxy.key")
     print(f"115 Sync API listening on http://{HOST}:{PORT}", flush=True)
     server.serve_forever()
 

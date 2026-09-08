@@ -5,6 +5,7 @@ import io
 import json
 import re
 import sys
+import subprocess
 import tempfile
 import zipfile
 from pathlib import Path, PurePosixPath
@@ -29,12 +30,48 @@ findings = []
 RCLONE_SHA256 = 'a7094d6e48c6c26cb069175ae93ee221db7dabfa18f57cb6bf3d3d5e1fb1cf3a'
 
 
+def inspect_reviewed_wheel(name, body):
+    # Exact public input/build hashes distinguish upstream test keys from personal secrets.
+    provenance = json.loads((ROOT / 'projects/xiaomi-115-sync-plugin/build-report.json').read_text())
+    approved = dict(provenance['wheels'])
+    from_path = ROOT / 'shared'
+    sys.path.insert(0, str(from_path))
+    from offline_dependencies import PIP_WHEEL, PIP_SHA256
+    approved[PIP_WHEEL] = PIP_SHA256
+    filename = name.rsplit('!', 1)[-1].rsplit('/', 1)[-1]
+    if approved.get(filename) != hashlib.sha256(body).hexdigest():
+        raise ValueError('Unreviewed or changed dependency wheel: ' + filename)
+    with zipfile.ZipFile(io.BytesIO(body)) as archive:
+        if sum(item.file_size for item in archive.infolist()) > 128 * 1024 * 1024:
+            raise ValueError('Oversized dependency wheel')
+        if archive.testzip() is not None:
+            raise ValueError('Corrupt dependency wheel')
+        names = set()
+        for item in archive.infolist():
+            path = PurePosixPath(item.filename)
+            if path.is_absolute() or '..' in path.parts or '\\' in item.filename or item.filename in names:
+                raise ValueError('Unsafe dependency member')
+            names.add(item.filename)
+            mode = (item.external_attr >> 16) & 0o170000
+            if mode not in (0, 0o100000, 0o040000):
+                raise ValueError('Special dependency member')
+            if item.filename.endswith(('.pyd', '.pyc')):
+                raise ValueError('Unexpected platform/bytecode member')
+            if item.filename.endswith('.so'):
+                elf = archive.read(item)
+                if elf[:6] != b'\x7fELF\x02\x01' or elf[18:20] != b'\xb7\x00':
+                    raise ValueError('Dependency extension is not Linux ARM64')
+
+
 def inspect(name, body, depth=0):
     parts = PurePosixPath(name).parts
     if set(parts) & FORBIDDEN or name.startswith('/') or '..' in parts:
         findings.append((name, 'forbidden distribution path'))
     if name.endswith(('.pyc', '.so', '.pyd')):
         findings.append((name, 'platform or bytecode artifact'))
+    if name.endswith('.whl'):
+        inspect_reviewed_wheel(name, body)
+        return
     if name.endswith('.zip'):
         if depth > 2:
             raise RuntimeError('Nested archive limit exceeded')
@@ -63,10 +100,40 @@ def inspect(name, body, depth=0):
             findings.append((name, kind))
 
 
+def inspect_staged(root=ROOT):
+    """Scan index blobs, not unstaged replacements or unrelated local files."""
+    names = subprocess.check_output([
+        'git', 'diff', '--cached', '--name-only', '--diff-filter=ACMR', '-z',
+    ], cwd=root).split(b'\0')
+    count = 0
+    for raw in names:
+        if not raw:
+            continue
+        name = raw.decode('utf-8')
+        entry = subprocess.check_output(['git', 'ls-files', '--stage', '-z', '--', name], cwd=root)
+        if not entry.startswith(b'100644 ') and not entry.startswith(b'100755 '):
+            findings.append((name, 'non-regular staged file'))
+            continue
+        body = subprocess.check_output(['git', 'show', ':' + name], cwd=root)
+        inspect(name, body)
+        count += 1
+    return count
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--artifacts', type=Path, default=ROOT / 'artifacts')
+    parser.add_argument('--staged', action='store_true', help='Read-only privacy check of staged Git blobs; not release verification')
     args = parser.parse_args()
+    findings.clear()
+    if args.staged:
+        count = inspect_staged()
+        if findings:
+            for name, kind in sorted(set(findings)):
+                print(f'BLOCKED: {name}: {kind}')
+            raise SystemExit('Commit blocked; no matching secret values were printed')
+        print(json.dumps({'ok': True, 'stagedFilesScanned': count, 'releaseVerified': False}))
+        return
     files = 0
     for file in ROOT.rglob('*'):
         relative = file.relative_to(ROOT)

@@ -5,7 +5,6 @@ from __future__ import annotations
 import argparse
 import hashlib
 import hmac
-import ipaddress
 import json
 import mimetypes
 import os
@@ -15,12 +14,17 @@ import secrets
 import signal
 import threading
 import time
+import sys
 from http.cookies import SimpleCookie, CookieError
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, urlsplit
 
 from engine import Engine, Error
+
+if (Path(__file__).resolve().parents[2] / 'shared').is_dir():
+    sys.path.insert(0, str(Path(__file__).resolve().parents[2] / 'shared'))
+from plugin_security import load_proxy_key, trusted_owner, session_key_v2
 
 PROJECT = Path(__file__).resolve().parent
 WEB = PROJECT / 'web'
@@ -30,7 +34,7 @@ TTL = 30 * 86400
 class Server(ThreadingHTTPServer):
     daemon_threads = True
 
-    def __init__(self, addr, engine, user, dev=False):
+    def __init__(self, addr, engine, user, dev=False, proxy_key=''):
         self.engine, self.user, self.dev = engine, user, dev
         self.probe_lock = threading.Lock()
         keyfile = engine.data / 'session.key'
@@ -38,7 +42,8 @@ class Server(ThreadingHTTPServer):
             with keyfile.open('xb') as stream:
                 os.chmod(keyfile, 0o600)
                 stream.write(secrets.token_bytes(32))
-        self.key = keyfile.read_bytes()
+        self.key = session_key_v2(keyfile.read_bytes(), 'webdav', user)
+        self.proxy_key = proxy_key
         super().__init__(addr, Handler)
 
 
@@ -87,15 +92,7 @@ class Handler(BaseHTTPRequestHandler):
     def trusted(self):
         if self.server.dev:
             return True
-        verify = self.headers.get('X-Xiaomi-Client-Verify', '') == 'SUCCESS'
-        dn = self.headers.get('X-Xiaomi-Client-DN', '')
-        owner = re.search(r'CN=nas\.' + re.escape(self.server.user.lstrip('u')) + r'\.', dn)
-        if verify and owner:
-            return True
-        try:
-            return ipaddress.ip_address(self.headers.get('X-Real-IP', '')).is_loopback
-        except ValueError:
-            return False
+        return trusted_owner(self.headers, self.server.user, self.server.proxy_key)
 
     def require(self, write=False):
         token = self.session()
@@ -188,6 +185,7 @@ def main():
     if not args.dev and not re.fullmatch(r'u[0-9]+', user):
         raise SystemExit('NAS_USER_ID is required')
     data = Path(os.getenv('DATA_DIR', '/data/plugin/webdav/data'))
+    proxy_key = load_proxy_key(data.parent / 'proxy.key')
     root = Path(os.getenv('LOCAL_ROOT', f'/nas/pool0/{user}/data'))
     binary = Path(os.getenv('RCLONE_BINARY', str(PROJECT / 'bin/rclone')))
     if not binary.is_file():
@@ -202,7 +200,7 @@ def main():
         os.setgid(account.pw_gid)
         os.setuid(account.pw_uid)
     engine = Engine(data, root, binary)
-    app = Server(('127.0.0.1', args.port), engine, user, args.dev)
+    app = Server(('127.0.0.1', args.port), engine, user, args.dev, proxy_key)
     supervisor = threading.Thread(target=engine.supervise, daemon=True)
     supervisor.start()
     def shutdown(*_):

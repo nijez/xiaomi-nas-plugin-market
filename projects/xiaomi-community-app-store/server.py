@@ -6,20 +6,25 @@ from __future__ import annotations
 import argparse
 import hashlib
 import hmac
-import ipaddress
 import json
 import mimetypes
 import os
 import secrets
 import threading
 import time
+import sys
+import re
 from http import HTTPStatus
-from http.cookies import SimpleCookie
+from http.cookies import SimpleCookie, CookieError
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import unquote, urlparse
 
 from storelib import InstallManager, StoreError, load_verified_catalog
+
+if (Path(__file__).resolve().parents[2] / "shared").is_dir():
+    sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "shared"))
+from plugin_security import load_proxy_key, trusted_owner, session_key_v2
 
 
 PROJECT = Path(__file__).resolve().parent
@@ -66,13 +71,16 @@ class StoreHandler(BaseHTTPRequestHandler):
         header_session = self.headers.get("X-Community-Session", "").strip()
         if header_session:
             return header_session
-        cookie = SimpleCookie(self.headers.get("Cookie", ""))
+        try:
+            cookie = SimpleCookie(self.headers.get("Cookie", ""))
+        except CookieError:
+            return None
         morsel = cookie.get(COOKIE_NAME)
         return morsel.value if morsel else None
 
     def _session(self) -> dict[str, object] | None:
         session_id = self._session_id()
-        if not session_id:
+        if not session_id or not re.fullmatch(r"[0-9]{1,12}\.[A-Za-z0-9_-]{32}\.[a-f0-9]{64}", session_id):
             return None
         try:
             payload, provided = session_id.rsplit(".", 1)
@@ -101,12 +109,7 @@ class StoreHandler(BaseHTTPRequestHandler):
         return f"{COOKIE_NAME}={session_id}; Path={cookie_path}; HttpOnly; SameSite=Strict{secure}; Max-Age={SESSION_TTL}"
 
     def _trusted_xiaomi_client(self) -> bool:
-        if self.headers.get("X-Xiaomi-Client-Verify", "").upper() == "SUCCESS":
-            return True
-        try:
-            return ipaddress.ip_address(self.headers.get("X-Real-IP", "")).is_loopback
-        except ValueError:
-            return False
+        return trusted_owner(self.headers, self.app.owner, self.app.proxy_key)
 
     def _require_session(self, write: bool = False) -> dict[str, object] | None:
         session = self._session()
@@ -138,7 +141,7 @@ class StoreHandler(BaseHTTPRequestHandler):
             session_id, session = self._new_session()
         csrf = str(session["csrf"]) if session else ""
         html = (WEB / "index.html").read_text(encoding="utf-8")
-        html = html.replace("__CSRF_TOKEN__", csrf).replace("__SESSION_TOKEN__", session_id or self._session_id() or "")
+        html = html.replace("__CSRF_TOKEN__", csrf).replace("__SESSION_TOKEN__", (session_id or self._session_id() or "") if session else "")
         headers = {}
         if session_id:
             headers["Set-Cookie"] = self._session_cookie(session_id)
@@ -152,7 +155,7 @@ class StoreHandler(BaseHTTPRequestHandler):
         if path == "/api/status":
             if not self._require_session():
                 return
-            self._json(HTTPStatus.OK, {"ok": True, "version": "0.1.2", "mode": "preview" if self.app.dev else "active"})
+            self._json(HTTPStatus.OK, {"ok": True, "version": "0.1.3-beta.1", "mode": "preview" if self.app.dev else "active"})
             return
         if path == "/healthz":
             self._json(HTTPStatus.OK, {"ok": True})
@@ -226,11 +229,13 @@ class StoreHandler(BaseHTTPRequestHandler):
 
 
 class StoreServer(ThreadingHTTPServer):
-    def __init__(self, address: tuple[str, int], dev: bool, manager: InstallManager | None, admin_token: str):
+    def __init__(self, address: tuple[str, int], dev: bool, manager: InstallManager | None, admin_token: str, owner: str = "", proxy_key: str = ""):
         super().__init__(address, StoreHandler)
         self.dev = dev
         self.manager = manager
-        self.session_key = hashlib.sha256(admin_token.encode("utf-8")).digest()
+        self.owner = owner or (manager.user_id if manager else "")
+        self.proxy_key = proxy_key
+        self.session_key = session_key_v2(hashlib.sha256(admin_token.encode("utf-8")).digest(), "communitystore", self.owner)
 
 
 def main() -> int:
@@ -254,7 +259,8 @@ def main() -> int:
             raise SystemExit("Admin token is too short")
     else:
         admin_token = "preview-only-token-not-for-production"
-    server = StoreServer((args.host, args.port), args.dev, manager, admin_token)
+    server = StoreServer((args.host, args.port), args.dev, manager, admin_token, args.user_id,
+                         load_proxy_key(args.admin_token_file.parent / "proxy.key"))
     print(f"Community store listening on http://{args.host}:{args.port} ({'preview' if args.dev else 'active'})")
     try:
         server.serve_forever()

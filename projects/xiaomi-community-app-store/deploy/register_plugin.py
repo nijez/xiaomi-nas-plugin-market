@@ -28,9 +28,13 @@ def main() -> int:
     parser.add_argument("--user-id", required=True)
     parser.add_argument("--plugin-id", type=int, default=11002)
     args = parser.parse_args()
+    return register_to(Path(f"/data/plugin/{args.user_id}.list"), args.user_id, args.plugin_id)
+
+
+def register_to(path: Path, user_id: str, plugin_id: int) -> int:
+    args = argparse.Namespace(user_id=user_id, plugin_id=plugin_id)
     if not args.user_id.replace("_", "").replace("-", "").isalnum() or args.plugin_id < 1:
         raise RuntimeError("Invalid user ID or plugin ID")
-    path = Path(f"/data/plugin/{args.user_id}.list")
     registry = load(path)
     for key, record in registry.items():
         if key == PLUGIN_KEY or not isinstance(record, dict):
@@ -61,7 +65,7 @@ def main() -> int:
             "plugin": PLUGIN_KEY,
             "name": "插件市场",
             "id": args.plugin_id,
-            "version": "0.1.2",
+            "version": "0.1.3",
             "tags": ["store", "community"],
             "desc": "安装、更新和管理经过签名的社区插件",
             "developer": "Kingwell Community",

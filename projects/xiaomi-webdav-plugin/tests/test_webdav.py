@@ -144,7 +144,7 @@ class ConfigurationTests(Base):
 class AuthTests(Base):
     def setUp(self):
         super().setUp()
-        self.server = Server(('127.0.0.1', 0), self.engine, 'u123', False)
+        self.server = Server(('127.0.0.1', 0), self.engine, 'u123', False, 'b' * 64)
         self.thread = threading.Thread(target=self.server.serve_forever, daemon=True)
         self.thread.start()
         self.url = f'http://127.0.0.1:{self.server.server_port}'
@@ -167,7 +167,7 @@ class AuthTests(Base):
         self.assertEqual(self.request('/api/status').status, 401)
         html = self.request('/', headers={'X-Xiaomi-Client-Verify':'SUCCESS', 'X-Xiaomi-Client-DN':'CN=nas.999.a'}).read().decode()
         self.assertIn('name="webdav-session" content=""', html)
-        response = self.request('/', headers={'X-Xiaomi-Client-Verify':'SUCCESS', 'X-Xiaomi-Client-DN':'CN=nas.123.a'})
+        response = self.request('/', headers={'X-Xiaomi-Client-Verify':'SUCCESS', 'X-Xiaomi-Client-DN':'CN=nas.123.a', 'X-Plugin-Proxy-Key':'b' * 64})
         html = response.read().decode()
         import re
         token = re.search('name="webdav-session" content="([^"]+)"', html)[1]

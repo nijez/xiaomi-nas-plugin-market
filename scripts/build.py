@@ -4,6 +4,7 @@ import hashlib
 import shutil
 import subprocess
 import runpy
+import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -26,6 +27,11 @@ def main():
         raise SystemExit('Signing keys must be outside the public repository')
     store = ROOT / 'projects/xiaomi-community-app-store'
     webdav = ROOT / 'projects/xiaomi-webdav-plugin'
+    sys.path.insert(0, str(store / 'scripts'))
+    from build_repository import PACKAGE_SPECS, assert_catalog_matches_sources, check_dependencies
+    if not args.refresh_installer:
+        for spec in PACKAGE_SPECS:
+            check_dependencies(spec)
     if not args.refresh_installer and not (webdav / 'bin/rclone').is_file():
         raise SystemExit('Verified Linux ARM64 rclone is required; see BUILD.md')
     artifacts = args.output.resolve()
@@ -40,6 +46,7 @@ def main():
             '--include-candidates', cwd=store)
     elif not (stage / 'catalog.json.sig').exists():
         raise SystemExit('No existing signed catalog to reuse')
+    assert_catalog_matches_sources(stage)
     shutil.copytree(stage, store / 'catalog', dirs_exist_ok=True)
     run('python3', 'scripts/build_release.py', cwd=store)
     version = runpy.run_path(str(store / 'scripts/build_release.py'))['VERSION']

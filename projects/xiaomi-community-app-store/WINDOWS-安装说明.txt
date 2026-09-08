@@ -1,6 +1,11 @@
 小米智能存储插件市场 - Windows 安装说明
 =========================================
 
+本包为 0.1.3-beta.1 公开测试版，不是稳定版。
+请下载 GitHub Releases 的 xiaomi-plugin-market-0.1.3-beta.1.zip。
+Windows 10/11 完整实机安装尚待用户反馈；客户端 token/中继路径可能被拒绝。
+仅建议能通过 SSH 恢复的用户测试，先备份配置，不用于唯一副本数据。
+
 适用条件
 --------
 1. 小米智能存储已经通过可信流程开启 root 密钥 SSH。
@@ -44,11 +49,12 @@ Windows 没有 OpenSSH 客户端
 
 校验发布包
 ----------
-在 ZIP 所在目录打开 PowerShell，运行：
+在 ZIP 所在目录打开 PowerShell，将下面文件名替换为实际下载的 ZIP：
 
-Get-FileHash .\xiaomi-plugin-market-0.1.2.zip -Algorithm SHA256
+Get-FileHash -LiteralPath '.\下载的安装包文件名.zip' -Algorithm SHA256
 
 将输出与一同发布的 SHA256SUMS.txt 比对，一致后再解压安装。
 
-此版本尚未在实体 Windows 10/11 上完成安装验收。115 和阿里云盘需要
-各自已批准的 App ID；WebDAV 多用户版本标记为测试版，使用前备份配置。
+0.1.3 源码已根据首个实体 Windows 反馈修复安装末尾健康检查的引号兼容问题，
+修复版仍需 Windows 10/11 复测。115 和阿里云盘需要各自已批准的 App ID；
+WebDAV 多用户版本标记为测试版，使用前备份配置。

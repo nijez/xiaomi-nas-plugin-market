@@ -2,11 +2,13 @@
 
 小米智能存储的第三方插件生态。**非小米官方产品，与小米、115、阿里云盘没有隶属或背书关系。**
 
+> **0.1.3-beta.1 公开测试包**包含本轮修复与重新签名的五个插件。它不是稳定版：Windows 完整安装及 Mac/Android token/中继兼容仍待反馈。先备份，保留 SSH 恢复能力，不用唯一副本数据测试。见 [测试版说明](docs/RELEASE-0.1.3-beta.1.md)。旧 0.1.2 附件不包含这些修复。
+
 在已开启密钥 SSH 的自有 NAS 上安装一次插件市场，之后从小米智能存储客户端安装和管理插件。页面随客户端连接当前设备，不要求 NAS 固定 IP。
 
 ## 下载与安装
 
-在本仓库 **Releases** 下载 `xiaomi-plugin-market-0.1.2.zip` 和 `SHA256SUMS.txt`。不要用 GitHub 的 `Source code.zip` 代替安装包。
+从 [0.1.3-beta.1 测试版](https://github.com/nijez/xiaomi-nas-plugin-market/releases/tag/v0.1.3-beta.1) 下载 `xiaomi-plugin-market-0.1.3-beta.1.zip` 及 `SHA256SUMS.txt`。一个 ZIP 同时包含 Windows、Mac 和终端安装入口。不要下载 `Source code.zip` 代替安装包。
 
 1. 确认 NAS 已 root，电脑与 NAS 在同一局域网，并且你持有这台 NAS 自己的 root SSH 私钥。
 2. 核对 SHA-256 后完整解压，不要在压缩包内直接运行。

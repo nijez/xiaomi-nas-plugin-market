@@ -74,7 +74,7 @@ function scheduleLabel(value) {
 async function api(route, options = {}) {
   const response = await fetch(apiUrl(route), {
     method: options.method || 'GET',
-    headers: options.body ? { 'Content-Type': 'application/json' } : undefined,
+    headers: { 'Content-Type': 'application/json', 'X-Plugin-Request': '1' },
     body: options.body ? JSON.stringify(options.body) : undefined,
     cache: 'no-store',
   });
